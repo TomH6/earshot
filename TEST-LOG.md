@@ -5,6 +5,24 @@ The version name is also shown at the bottom of the game page, so you can check 
 
 ---
 
+## v1.8 "Full Volume" (2026-10-10)
+
+**Changes**
+- Music always plays at 100% (was 80% by default). Players use their device volume.
+- Volume buttons (− / +) and the volume bar removed from the control bar.
+- Added a limiter on the final output so full volume stays loud without distorting when you reach the speakers.
+
+**Tests** (headless Chrome, simulated Apple Music with a loud test tone)
+
+| Test | Expected | Result |
+|---|---|---|
+| Volume controls | Gone from the page | Pass: 0 found |
+| Full round to 0 m with a loud song | Plays to the end, no errors | Pass |
+| Footer | v1.8 "Full Volume" | Pass |
+| Script errors | None | Pass: none |
+
+---
+
 ## v1.7 "Players" (2026-10-10)
 
 **Changes**
