@@ -5,6 +5,23 @@ The version name is also shown at the bottom of the game page, so you can check 
 
 ---
 
+## v1.3 "Dev Mode" (2026-10-10)
+
+**Changes**
+- New `DEV_MODE` switch near the top of the game code. While it's on, every page refresh plays a new song from the shuffled deck (no repeats until all 70 have played). The top-right label shows "DEV MODE".
+- With dev mode off (for launch), the page plays one daily song, the same for everyone that day, labelled "Daily #N". New game still gives practice songs.
+- Either mode can be tried without changing code by adding `#daily` or `#dev` to the end of the address.
+
+**Tests** (headless Chrome, simulated Apple Music responses, page served at the real site address)
+
+| Test | Expected | Result |
+|---|---|---|
+| 3 refreshes in dev mode | 3 different songs, label "Dev mode" | Pass: Africa, More Than a Feeling, Zombie |
+| 2 refreshes with `#daily` | Same song both times, label "Daily #1" | Pass: Dream On both times |
+| Script errors | None | Pass: none |
+
+---
+
 ## v1.2 "No Repeats" (2026-10-10)
 
 **Problem found:** the same song kept coming back. Cause: on every page load the game played the "daily" song, which is fixed for the whole day, so each refresh replayed it. New game also only avoided the song just played.

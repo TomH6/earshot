@@ -200,7 +200,7 @@ input[type=file] { font: inherit; color: var(--muted); max-width: 100%; }
       <li>The music stops while you guess. A wrong guess moves you 150 m closer. You get 3 buzzes.</li>
       <li>Wind gusts come and go, so listen for the gaps.</li>
     </ul>
-    <p class="hint" style="margin:0">Earshot v1.2 "No Repeats"</p>
+    <p class="hint" style="margin:0">Earshot v1.3 "Dev Mode"</p>
     <p class="hint">The built-in songs are public-domain classics, played as 90s-style rock covers by a built-in band. No files needed.</p>
   </details>
 </div>
@@ -294,6 +294,10 @@ input[type=file] { font: inherit; color: var(--muted); max-width: 100%; }
   const tAt = d => Math.pow(Math.max(0, 1 - d / START_D), 1 / CURVE);
 
   const S = { phase: "idle", t: 0, d: START_D, buzzes: BUZZES, log: [], song: dailySong, scene: dailyScene, label: "Free play", daily: false };
+  // Dev mode: a new random song on every refresh. Set to false at launch for one daily song for everyone.
+  // Override with #daily or #dev at the end of the address to try either mode.
+  const DEV_MODE = location.hash === "#daily" ? false : location.hash === "#dev" ? true : true;
+  S.label = DEV_MODE ? "Dev mode" : `Daily #${dayNo + 1}`; S.daily = !DEV_MODE;
 
   // ---------- Audio ----------
   let gtrIn, leadIn, vol = 0.8;
@@ -726,7 +730,7 @@ input[type=file] { font: inherit; color: var(--muted); max-width: 100%; }
     initAudio(); ctx.resume();
     stopMusic();
     S.scene = SCENES[Math.floor(Math.random() * SCENES.length)];
-    S.label = "Free play"; S.daily = false;
+    S.label = DEV_MODE ? "Dev mode" : "Practice"; S.daily = false;
     if (previewMode) {
       resetRound();
       await prepareRound(drawEntry());
@@ -858,7 +862,7 @@ input[type=file] { font: inherit; color: var(--muted); max-width: 100%; }
   }
 
   resetRound(); setVol(vol);
-  prepareRound(drawEntry());
+  prepareRound(DEV_MODE ? drawEntry() : CLASSIC[(dayNo * 7 + 3) % CLASSIC.length]);
   requestAnimationFrame(frame);
 })();
 </script>
