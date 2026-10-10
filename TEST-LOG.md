@@ -5,6 +5,26 @@ The version name is also shown at the bottom of the game page, so you can check 
 
 ---
 
+## v1.6 "End of the Road" (2026-10-10)
+
+**Changes**
+- When the car reaches the speakers (0 m) without a correct guess, the round ends on its own: the guess form and buzz button are hidden, and the result shows "Time's up! It was …".
+- Same when a wrong guess's 150 m penalty pushes the car to 0 m.
+- The song name is also shown on the scene ("Now playing: …") at the end of every round, and the page scrolls to the result.
+- Share text for a timed-out round says "⏱️ Ran out of road". Buzz history line only appears if there were buzzes.
+- Small fix: "An 80s classic" instead of "A 80s classic".
+
+**Tests** (headless Chrome, simulated Apple Music responses, test copies with a 4 s and 10 s drive so the end is reached quickly)
+
+| Test | Expected | Result |
+|---|---|---|
+| Let the drive run out | Result shown, form and buzz hidden, "Time's up!", song on scene | Pass: Crazy Train |
+| Wrong guess at 124 m (penalty reaches 0 m) | Round ends the same way | Pass: Paradise City |
+| Share text after time-out | One "Ran out of road" line, no duplicate icon | Pass (after fix) |
+| Script errors | None | Pass: none |
+
+---
+
 ## v1.5 "One-Time Pass" (2026-10-10)
 
 **What the run log showed** (Tom's Chrome, 17:45–17:55)

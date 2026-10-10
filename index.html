@@ -302,7 +302,7 @@ input[type=file] { font: inherit; color: var(--muted); max-width: 100%; }
   const S = { phase: "idle", t: 0, d: START_D, buzzes: BUZZES, log: [], song: dailySong, scene: dailyScene, label: "Free play", daily: false };
   // Dev mode: a new random song on every refresh. Set to false at launch for one daily song for everyone.
   // Override with #daily or #dev at the end of the address to try either mode.
-  const VERSION = 'v1.5 "One-Time Pass"';
+  const VERSION = 'v1.6 "End of the Road"';
   const START_HASH = location.hash;
   const DEV_MODE = START_HASH === "#daily" ? false : START_HASH === "#dev" ? true : true;
   // #daily / #dev apply to this one load only: clear them so the next refresh is back to normal
@@ -597,6 +597,7 @@ input[type=file] { font: inherit; color: var(--muted); max-width: 100%; }
     S.buzzes--; S.log.push("❌"); renderPips();
     if (S.buzzes <= 0) return finish(false);
     S.d = Math.max(0, S.d - PENALTY); S.t = tAt(S.d); applyDistance(S.d); renderDistance();
+    if (S.d <= 0) return finish(false, "time");
     $("guessMsg").textContent = msg; $("guessMsg").className = "msg bad";
     setTimeout(() => {
       if (S.phase !== "guessing") return;
@@ -608,7 +609,7 @@ input[type=file] { font: inherit; color: var(--muted); max-width: 100%; }
 
   function right() { S.log.push("✅"); finish(true); }
 
-  function finish(won) {
+  function finish(won, reason) {
     S.phase = "done"; hold(false);
     // Let the reveal play for 5 seconds, then fade the music out
     clearTimeout(S.endTimer); clearTimeout(S.endTimer2);
@@ -625,13 +626,16 @@ input[type=file] { font: inherit; color: var(--muted); max-width: 100%; }
     $("result").hidden = false; $("result").classList.toggle("lost", !won);
     $("listenLink").hidden = !S.song.link; if (S.song.link) $("listenLink").href = S.song.link;
     $("resScore").textContent = won ? `${fmt(score)} m` : "0 m";
-    $("resTitle").textContent = won ? `You named “${S.song.title}” from ${fmt(score)} m away.` : `It was “${S.song.title}”.`;
+    $("resTitle").textContent = won ? `You named “${S.song.title}” from ${fmt(score)} m away.` : reason === "time" ? `Time's up! It was “${S.song.title}”.` : `It was “${S.song.title}”.`;
+    // Show the song name on the scene too
+    $("sceneText").textContent = "Now playing: "; $("sceneText").append(Object.assign(document.createElement("b"), { textContent: S.song.title }));
     $("resSub").textContent = won
       ? (score >= 900 ? "Bat ears. That's barely more than a bassline at this range." : score >= 500 ? "Sharp ears. Most people need to get a lot closer." : score >= 200 ? "Solid. You got it before the melody was fully clear." : "Got there in the end, right by the speakers.")
-      : "You drove right up to the speakers. Listen to it clearly now.";
-    if (S.song.decade) $("resSub").textContent += ` A ${S.song.decade}s classic.`;
-    const line = won ? `📍 ${fmt(score)} m away at ${Math.round(S.buzzKmh || 0)} km/h` : "📍 Had to stand next to the speaker";
-    $("shareText").textContent = `Earshot ${S.daily ? "#" + (dayNo + 1) : "(practice)"} 🎵\n${line}\n${S.log.join("")}`;
+      : reason === "time" ? "You reached the speakers without naming it. Here it is, loud and clear." : "You drove right up to the speakers. Listen to it clearly now.";
+    if (S.song.decade) $("resSub").textContent += ` ${S.song.decade === 80 ? "An" : "A"} ${S.song.decade}s classic.`;
+    const line = won ? `📍 ${fmt(score)} m away at ${Math.round(S.buzzKmh || 0)} km/h` : reason === "time" ? "⏱️ Ran out of road" : "📍 Had to stand next to the speaker";
+    try { $("result").scrollIntoView({ block: "nearest", behavior: reduce ? "auto" : "smooth" }); } catch (_) {}
+    $("shareText").textContent = `Earshot ${S.daily ? "#" + (dayNo + 1) : "(practice)"} 🎵\n${line}` + (S.log.length ? `\n${S.log.join("")}` : "");
     $("copyBtn").textContent = "Copy result";
   }
 
@@ -870,6 +874,7 @@ input[type=file] { font: inherit; color: var(--muted); max-width: 100%; }
       S.kmh = speedAt(S.t);
       const dt = Math.max(0, Math.min(0.25, (now - S.last) / 1000)); S.last = Math.max(S.last, now);
       S.t = Math.max(0, Math.min(1, S.t + dt / WALK_SECS)); S.d = dAt(S.t);
+      if (S.t >= 1) { S.d = 0; renderDistance(); finish(false, "time"); }
       applyDistance(S.d); renderDistance();
     } else if (S.phase === "done" && ctx && S.revealFrom > 0) {
       const k = Math.min(1, (now - S.revealStart) / 2500);
