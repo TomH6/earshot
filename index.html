@@ -1,0 +1,827 @@
+<title>Earshot</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=Figtree:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: one narrow column; a dusk "scene" canvas on top with the distance readout, controls below. Single dark theme by choice (night scene). */
+:root {
+  --night: #0d1122;
+  --dusk: #19203d;
+  --dusk-2: #252d52;
+  --ink: #ecebf5;
+  --muted: #9ba1c4;
+  --lamp: #ffb547;
+  --lamp-dim: rgba(255, 181, 71, .16);
+  --good: #72d9a6;
+  --bad: #ff8577;
+  --line: rgba(236, 235, 245, .12);
+  --f-display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --f-body: "Figtree", system-ui, -apple-system, sans-serif;
+  --f-num: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  color-scheme: dark;
+}
+[hidden] { display: none !important; }
+html, body { background: var(--night); color: var(--ink); }
+body { font-family: var(--f-body); font-size: 16px; line-height: 1.5; }
+.wrap { max-width: 640px; margin: 0 auto; padding: 24px 16px 48px; display: grid; gap: 20px; }
+
+header { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+.logo { font-family: var(--f-display); font-weight: 800; font-size: 2.1rem; letter-spacing: -.02em; line-height: 1; margin: 0; }
+.logo span { color: var(--lamp); }
+.tag { color: var(--muted); margin: 6px 0 0; font-size: .95rem; }
+.puzzle-no { font-family: var(--f-num); font-size: .8rem; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; text-align: right; }
+
+.stage { position: relative; border-radius: 18px; overflow: hidden; background: var(--dusk); border: 1px solid var(--line); }
+.stage canvas { display: block; width: 100%; height: 300px; }
+.scene { position: absolute; top: 14px; left: 16px; right: 16px; font-size: .85rem; color: var(--muted); letter-spacing: .02em; }
+.scene b { color: var(--ink); font-weight: 600; }
+.readout { position: absolute; left: 16px; bottom: 12px; display: flex; align-items: baseline; gap: 6px; pointer-events: none; }
+.readout .num { font-family: var(--f-num); font-weight: 600; font-size: clamp(2.6rem, 11vw, 3.6rem); font-variant-numeric: tabular-nums; line-height: 1; text-shadow: 0 2px 18px rgba(0,0,0,.5); }
+.readout .unit { font-family: var(--f-num); color: var(--muted); font-size: 1.1rem; }
+.speedo { position: absolute; top: 12px; right: 16px; font-family: var(--f-num); font-size: .8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.speedo span { color: var(--ink); font-size: 1.15rem; font-weight: 600; }
+.scene { padding-right: 90px; }
+.frozen { position: absolute; right: 16px; bottom: 18px; font-family: var(--f-num); font-size: .75rem; letter-spacing: .1em; text-transform: uppercase; color: var(--night); background: var(--lamp); padding: 4px 8px; border-radius: 6px; }
+
+.track { position: relative; height: 34px; }
+.track .rail { position: absolute; left: 0; right: 0; top: 10px; height: 4px; background: var(--dusk-2); border-radius: 4px; }
+.track .fill { position: absolute; left: 0; top: 10px; height: 4px; background: var(--lamp); border-radius: 4px; width: 0; }
+.track .me { position: absolute; top: 4px; width: 16px; height: 16px; margin-left: -8px; border-radius: 50%; background: var(--ink); box-shadow: 0 0 0 4px var(--night); left: 0; }
+.track .spk { position: absolute; right: -2px; top: 2px; width: 20px; height: 20px; border-radius: 4px; background: var(--lamp); box-shadow: 0 0 14px var(--lamp); }
+.ticks { position: absolute; left: 0; right: 0; top: 20px; display: flex; justify-content: space-between; font-family: var(--f-num); font-size: .7rem; color: var(--muted); }
+
+.controls { display: grid; gap: 12px; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+button { font: inherit; cursor: pointer; border: 0; border-radius: 12px; padding: 12px 18px; font-weight: 600; color: var(--ink); background: var(--dusk-2); }
+button:hover { filter: brightness(1.12); }
+button:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px solid var(--lamp); outline-offset: 2px; }
+button:disabled { opacity: .45; cursor: default; filter: none; }
+.big { flex: 1 1 220px; font-family: var(--f-display); font-weight: 800; font-size: 1.35rem; padding: 18px; letter-spacing: -.01em; }
+.primary { background: var(--lamp); color: var(--night); }
+.ghost { background: transparent; color: var(--muted); border: 1px solid var(--line); }
+.hint { color: var(--muted); font-size: .85rem; }
+kbd { font-family: var(--f-num); font-size: .78rem; border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; }
+
+.tleft { display: flex; gap: 8px; flex-wrap: wrap; }
+.transport { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--dusk); }
+.tbtn { display: inline-flex; align-items: center; gap: 8px; padding: 9px 14px; border-radius: 10px; background: var(--dusk-2); }
+.tbtn.sq { width: 38px; height: 38px; padding: 0; justify-content: center; font-size: 1.3rem; line-height: 1; }
+.vol { display: flex; align-items: center; gap: 8px; }
+.volmeter { width: 90px; height: 6px; border-radius: 6px; background: var(--dusk-2); overflow: hidden; }
+.volmeter div { height: 100%; width: 80%; background: var(--lamp); }
+#volLabel { min-width: 5.5em; font-family: var(--f-num); font-size: .78rem; font-variant-numeric: tabular-nums; }
+.pips { display: flex; gap: 6px; align-items: center; color: var(--muted); font-size: .85rem; }
+.pip { width: 10px; height: 10px; border-radius: 50%; background: var(--lamp); }
+.pip.used { background: var(--dusk-2); }
+
+.panel { background: var(--dusk); border: 1px solid var(--line); border-radius: 16px; padding: 18px; display: grid; gap: 12px; }
+.panel h2 { font-family: var(--f-display); font-weight: 800; font-size: 1.3rem; margin: 0; letter-spacing: -.01em; text-wrap: balance; }
+form.guess { display: flex; gap: 10px; flex-wrap: wrap; }
+input[type=text] { flex: 1 1 220px; min-width: 0; font: inherit; color: var(--ink); background: var(--night); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+.msg { min-height: 1.5em; font-size: .92rem; }
+.msg.bad { color: var(--bad); }
+
+.listen { color: var(--lamp); font-weight: 600; text-decoration: none; }
+.listen:hover { text-decoration: underline; }
+.score { font-family: var(--f-num); font-weight: 600; font-size: 3rem; color: var(--lamp); line-height: 1; font-variant-numeric: tabular-nums; }
+.result.lost .score { color: var(--muted); }
+pre.share { margin: 0; font-family: var(--f-num); font-size: .9rem; background: var(--night); border: 1px solid var(--line); border-radius: 10px; padding: 12px; white-space: pre-wrap; user-select: all; }
+
+details { border-top: 1px solid var(--line); padding-top: 14px; }
+summary { cursor: pointer; font-weight: 600; }
+details .inner { display: grid; gap: 10px; margin-top: 12px; }
+input[type=file] { font: inherit; color: var(--muted); max-width: 100%; }
+.how { color: var(--muted); font-size: .9rem; margin: 0; padding-left: 1.1em; display: grid; gap: 4px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1 class="logo">Ear<span>shot</span></h1>
+      <p class="tag">Name the song from as far away as you can.</p>
+    </div>
+    <div class="puzzle-no" id="puzzleNo">Daily #1</div>
+  </header>
+
+  <div class="stage">
+    <canvas id="scene" aria-hidden="true"></canvas>
+    <div class="scene" id="sceneText">Somewhere out there: <b>…</b></div>
+    <div class="readout"><span class="num" id="dist">2,000</span><span class="unit">m</span></div>
+    <div class="frozen" id="frozen" hidden>Frozen</div>
+    <div class="speedo"><span id="speed">0</span> km/h</div>
+  </div>
+
+  <div class="track" aria-hidden="true">
+    <div class="rail"></div><div class="fill" id="fill"></div>
+    <div class="spk"></div><div class="me" id="me"></div>
+    <div class="ticks"><span>2 km</span><span>1.5 km</span><span>1 km</span><span>500 m</span><span>here</span></div>
+  </div>
+
+  <div class="controls">
+    <div class="row">
+      <button class="big primary" id="startBtn">Start driving</button>
+      <button class="big primary" id="buzzBtn" hidden>I know it!</button>
+    </div>
+    <p class="hint" id="srcNote" style="margin:0"></p>
+    <div class="transport">
+      <div class="tleft">
+      <button id="pauseBtn" class="tbtn" disabled aria-label="Pause">
+        <svg id="icoPause" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1" fill="currentColor"/><rect x="14" y="5" width="4" height="14" rx="1" fill="currentColor"/></svg>
+        <svg id="icoPlay" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" hidden><path d="M7 5l12 7-12 7z" fill="currentColor"/></svg>
+        <span id="pauseLabel">Pause</span>
+      </button>
+      <button id="restartBtn" class="tbtn" aria-label="Restart this song from 2 km" title="Restart this song from 2 km">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M5 12a7 7 0 1 0 2.05-4.95" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M4 4v5h5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>Restart</span>
+      </button>
+      <button id="newBtn" class="tbtn" aria-label="New game with a different song" title="New game with a different song">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+        <span>New game</span>
+      </button>
+      </div>
+      <div class="vol">
+        <button id="volDown" class="tbtn sq" aria-label="Volume down">−</button>
+        <div class="volmeter" aria-hidden="true"><div id="volBar"></div></div>
+        <button id="volUp" class="tbtn sq" aria-label="Volume up">+</button>
+        <span class="hint" id="volLabel">Vol 80%</span>
+      </div>
+    </div>
+    <div class="row" style="justify-content: space-between">
+      <div class="pips" id="pips"><span>Buzzes</span><i class="pip"></i><i class="pip"></i><i class="pip"></i></div>
+      <span class="hint" id="keyHint">Press <kbd>Space</kbd> to buzz</span>
+      <span class="msg bad" id="audioWarn" hidden>Your browser blocked the sound. Click anywhere on the page, then check your volume.</span>
+      <button class="ghost" id="giveUp" hidden>Give up</button>
+    </div>
+  </div>
+
+  <div class="panel" id="guessPanel" hidden>
+    <h2>Distance frozen. What's the song?</h2>
+    <form class="guess" id="guessForm" autocomplete="off">
+      <input type="text" id="guessInput" list="songList" placeholder="Start typing a song name" aria-label="Song name">
+      <button class="primary" type="submit">Guess</button>
+    </form>
+    <div class="row" id="selfJudge" hidden>
+      <button class="primary" id="judgeYes" type="button">I named it</button>
+      <button id="judgeNo" type="button">I was wrong</button>
+    </div>
+    <div class="msg" id="guessMsg"></div>
+  </div>
+
+  <div class="panel result" id="result" hidden>
+    <div class="score" id="resScore">840 m</div>
+    <h2 id="resTitle"></h2>
+    <p class="hint" id="resSub" style="margin:0"></p>
+    <a class="listen" id="listenLink" href="#" target="_blank" rel="noopener" hidden>Listen on Apple Music ↗</a>
+    <pre class="share" id="shareText"></pre>
+    <div class="row">
+      <button class="primary" id="copyBtn">Copy result</button>
+      <button id="practiceBtn">Play a practice round</button>
+    </div>
+  </div>
+
+  <details>
+    <summary>Optional: play your own 90s rock files</summary>
+    <div class="inner">
+      <p class="hint" style="margin:0">Pick a bunch of MP3s from your computer. Each round plays a random one. Name files like <b>Artist - Title.mp3</b> so guesses can be checked. Files play only in your browser and are never uploaded.</p>
+      <input type="file" id="fileInput" accept="audio/*" multiple aria-label="Choose song files">
+      <div class="row"><button class="primary" id="customBtn" disabled>Play a round from my songs</button><span class="hint" id="fileStatus">No songs loaded yet.</span></div>
+    </div>
+  </details>
+
+  <details open>
+    <summary>How to play</summary>
+    <ul class="how" style="margin-top:12px">
+      <li>You drive toward a song playing 2 km away. The music kicks in after 2 seconds on the road, and the whole drive takes 30 seconds.</li>
+      <li>Far away you mostly hear the bass and the echo. Up close the melody comes through.</li>
+      <li>Buzz the moment you recognize it. The distance freezes while you type.</li>
+      <li>The music stops while you guess. A wrong guess moves you 150 m closer. You get 3 buzzes.</li>
+      <li>Wind gusts come and go, so listen for the gaps.</li>
+    </ul>
+    <p class="hint">The built-in songs are public-domain classics, played as 90s-style rock covers by a built-in band. No files needed.</p>
+  </details>
+</div>
+
+<datalist id="songList"></datalist>
+
+<script>
+(() => {
+  // ---------- Songs (public domain melodies) ----------
+  const SONGS = [
+    { title: "Ode to Joy", aliases: ["beethoven 9", "symphony no 9"], bpm: 132, meter: 4, drums: true,
+      mel: "E5 E5 F5 G5 G5 F5 E5 D5 C5 C5 D5 E5 E5:1.5 D5:.5 D5:2 E5 E5 F5 G5 G5 F5 E5 D5 C5 C5 D5 E5 D5:1.5 C5:.5 C5:2",
+      roots: "C G C G C G C C" },
+    { title: "Twinkle Twinkle Little Star", aliases: ["twinkle twinkle", "abc song"], bpm: 150, meter: 4, drums: true,
+      mel: "C5 C5 G5 G5 A5 A5 G5:2 F5 F5 E5 E5 D5 D5 C5:2 G5 G5 F5 F5 E5 E5 D5:2 G5 G5 F5 F5 E5 E5 D5:2 C5 C5 G5 G5 A5 A5 G5:2 F5 F5 E5 E5 D5 D5 C5:2",
+      roots: "C F F G C C C G C F F G" },
+    { title: "Frère Jacques", aliases: ["frere jacques", "are you sleeping", "brother john"], bpm: 144, meter: 4, drums: true,
+      mel: "C5 D5 E5 C5 C5 D5 E5 C5 E5 F5 G5:2 E5 F5 G5:2 G5:.5 A5:.5 G5:.5 F5:.5 E5 C5 G5:.5 A5:.5 G5:.5 F5:.5 E5 C5 C5 G4 C5:2 C5 G4 C5:2",
+      roots: "C C C C C C C C" },
+    { title: "Jingle Bells", aliases: [], bpm: 168, meter: 4, drums: true,
+      mel: "E5 E5 E5:2 E5 E5 E5:2 E5 G5 C5:1.5 D5:.5 E5:4 F5 F5 F5:1.5 F5:.5 F5 E5 E5 E5:.5 E5:.5 E5 D5 D5 E5 D5:2 G5:2 E5 E5 E5:2 E5 E5 E5:2 E5 G5 C5:1.5 D5:.5 E5:4 F5 F5 F5 F5 F5 E5 E5 E5:.5 E5:.5 G5 G5 F5 D5 C5:4",
+      roots: "C C C C F C D G C C C C F C G C" },
+    { title: "Für Elise", aliases: ["fur elise", "fuer elise"], bpm: 160, meter: 3, ballad: true,
+      mel: "-:2 E5:.5 D#5:.5 E5:.5 D#5:.5 E5:.5 B4:.5 D5:.5 C5:.5 A4 -:.5 C4:.5 E4:.5 A4:.5 B4 -:.5 E4:.5 G#4:.5 B4:.5 C5 -:.5 E4:.5 E5:.5 D#5:.5 E5:.5 D#5:.5 E5:.5 B4:.5 D5:.5 C5:.5 A4 -:.5 C4:.5 E4:.5 A4:.5 B4 -:.5 E4:.5 C5:.5 B4:.5 A4:2 -",
+      roots: "A A A E A A A E A" },
+    { title: "In the Hall of the Mountain King", aliases: ["hall of the mountain king", "mountain king", "peer gynt"], bpm: 150, meter: 4, drums: true,
+      mel: "A4:.5 B4:.5 C5:.5 D5:.5 E5:.5 C5:.5 E5 D#5:.5 B4:.5 D#5 D5:.5 A#4:.5 D5 A4:.5 B4:.5 C5:.5 D5:.5 E5:.5 C5:.5 E5:.5 A5:.5 G5:.5 E5:.5 C5:.5 E5:.5 G5:2",
+      roots: "A B A E" },
+    { title: "Greensleeves", aliases: ["what child is this"], bpm: 120, meter: 3, ballad: true,
+      mel: "-:2 A4 C5:2 D5 E5:1.5 F5:.5 E5 D5:2 B4 G4:1.5 A4:.5 B4 C5:2 A4 A4:1.5 G#4:.5 A4 B4:2 G#4 E4:2 A4 C5:2 D5 E5:1.5 F5:.5 E5 D5:2 B4 G4:1.5 A4:.5 B4 C5:1.5 B4:.5 A4 G#4:1.5 F#4:.5 G#4 A4:3",
+      roots: "A F C G E A E E A F C G E A E A" },
+    { title: "When the Saints Go Marching In", aliases: ["when the saints", "the saints"], bpm: 176, meter: 4, drums: true,
+      mel: "- C5 E5 F5 G5:4 - C5 E5 F5 G5:4 - C5 E5 F5 G5:2 E5:2 C5:2 E5:2 D5:4 - E5 E5 D5 C5:3 C5 E5:2 G5:1.5 G5:.5 F5:4 E5 F5 G5 E5 C5:2 D5:2 C5:4",
+      roots: "C C C C C C C G C C C F C G C" },
+    { title: "Mary Had a Little Lamb", aliases: ["mary had a little lamb"], bpm: 160, meter: 4, drums: true,
+      mel: "E5 D5 C5 D5 E5 E5 E5:2 D5 D5 D5:2 E5 G5 G5:2 E5 D5 C5 D5 E5 E5 E5 E5 D5 D5 E5 D5 C5:4",
+      roots: "C C G C C C G C" },
+  ];
+  const DECOYS = ["Happy Birthday", "London Bridge Is Falling Down", "Brahms' Lullaby", "Swan Lake", "Canon in D", "Yankee Doodle",
+    "Row, Row, Row Your Boat", "Old MacDonald Had a Farm", "Auld Lang Syne", "Amazing Grace", "Turkish March", "Can-Can",
+    "William Tell Overture", "Hava Nagila", "Silent Night", "Moonlight Sonata", "The Blue Danube", "Wedding March", "Hush Little Baby"];
+  const SCENES = ["a beach bar down the coast", "a wedding in the next village", "an ice cream truck a few streets over",
+    "a street musician across the park", "a car with its windows down", "a rooftop party across town",
+    "a school band practicing after hours", "a carousel at a distant fair", "a neighbor's balcony speaker"];
+
+  // Classic rock catalog, 70s to 90s: [title, artist, decade]
+  const CLASSIC = [
+    ["Bohemian Rhapsody","Queen",70],["Hotel California","Eagles",70],["Stairway to Heaven","Led Zeppelin",70],["Dream On","Aerosmith",70],
+    ["Go Your Own Way","Fleetwood Mac",70],["Born to Run","Bruce Springsteen",70],["More Than a Feeling","Boston",70],["Paranoid","Black Sabbath",70],
+    ["Smoke on the Water","Deep Purple",70],["Highway to Hell","AC/DC",70],["Sweet Home Alabama","Lynyrd Skynyrd",70],["Baba O'Riley","The Who",70],
+    ["(Don't Fear) The Reaper","Blue Öyster Cult",70],["Heart of Glass","Blondie",70],["London Calling","The Clash",70],
+    ["Another Brick in the Wall, Pt. 2","Pink Floyd",70],["We Will Rock You","Queen",70],["Rock and Roll All Nite","KISS",70],["Free Bird","Lynyrd Skynyrd",70],
+    ["Back in Black","AC/DC",80],["Sweet Child O' Mine","Guns N' Roses",80],["Livin' on a Prayer","Bon Jovi",80],["Don't Stop Believin'","Journey",80],
+    ["Every Breath You Take","The Police",80],["With or Without You","U2",80],["Jump","Van Halen",80],["Eye of the Tiger","Survivor",80],
+    ["Here I Go Again","Whitesnake",80],["Pour Some Sugar on Me","Def Leppard",80],["Born in the U.S.A.","Bruce Springsteen",80],
+    ["Should I Stay or Should I Go","The Clash",80],["Under Pressure","Queen",80],["Africa","Toto",80],["The Final Countdown","Europe",80],
+    ["Welcome to the Jungle","Guns N' Roses",80],["Crazy Train","Ozzy Osbourne",80],["Money for Nothing","Dire Straits",80],["Summer of '69","Bryan Adams",80],
+    ["Jessie's Girl","Rick Springfield",80],["I Love Rock 'n' Roll","Joan Jett & The Blackhearts",80],["Paradise City","Guns N' Roses",80],
+    ["Smells Like Teen Spirit","Nirvana",90],["Wonderwall","Oasis",90],["Black Hole Sun","Soundgarden",90],["Under the Bridge","Red Hot Chili Peppers",90],
+    ["Zombie","The Cranberries",90],["Creep","Radiohead",90],["Enter Sandman","Metallica",90],["Losing My Religion","R.E.M.",90],
+    ["Basket Case","Green Day",90],["Everlong","Foo Fighters",90],["Song 2","Blur",90],["Bitter Sweet Symphony","The Verve",90],
+    ["Semi-Charmed Life","Third Eye Blind",90],["Iris","Goo Goo Dolls",90],["Plush","Stone Temple Pilots",90],["Interstate Love Song","Stone Temple Pilots",90],
+    ["1979","The Smashing Pumpkins",90],["Today","The Smashing Pumpkins",90],["Self Esteem","The Offspring",90],
+    ["Jeremy","Pearl Jam",90],["November Rain","Guns N' Roses",90],["Alive","Pearl Jam",90],
+    ["Glycerine","Bush",90],["Buddy Holly","Weezer",90],["Santeria","Sublime",90],["Closing Time","Semisonic",90],
+    ["Come As You Are","Nirvana",90],["Don't Look Back in Anger","Oasis",90],["Scar Tissue","Red Hot Chili Peppers",90]
+  ];
+  const ROCK90S = CLASSIC.map(([t, a]) => `${t} (${a})`);
+
+  const $ = id => document.getElementById(id);
+  const dl = $("songList");
+  function buildList() {
+    const seen = new Set(); dl.textContent = "";
+    const extra = (typeof playlist !== "undefined" ? playlist : []).map(p => p.artist ? `${p.title} (${p.artist})` : p.title);
+    [...extra, ...ROCK90S, ...SONGS.map(s => s.title), ...DECOYS].forEach(t => {
+      const k = t.toLowerCase(); if (seen.has(k)) return; seen.add(k);
+      const o = document.createElement("option"); o.value = t; dl.appendChild(o);
+    });
+  }
+
+  // ---------- Daily pick ----------
+  const EPOCH = new Date(2026, 9, 10);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const dayNo = Math.max(0, Math.round((today - EPOCH) / 864e5));
+  const dailySong = SONGS[(dayNo * 4 + 2) % SONGS.length];
+  const dailyScene = SCENES[(dayNo * 5 + 1) % SCENES.length];
+
+  // ---------- Game constants ----------
+  const START_D = 2000, WALK_SECS = 30, CURVE = 1.2, INTRO_MS = 2000, PENALTY = 150, BUZZES = 3;
+  const dAt = t => START_D * (1 - Math.pow(Math.min(1, t), CURVE));
+  const tAt = d => Math.pow(Math.max(0, 1 - d / START_D), 1 / CURVE);
+
+  const S = { phase: "idle", t: 0, d: START_D, buzzes: BUZZES, log: [], song: dailySong, scene: dailyScene, label: `Daily #${dayNo + 1}`, daily: true };
+
+  // ---------- Audio ----------
+  let gtrIn, leadIn, vol = 0.8;
+  // Hold = audio suspended on purpose (paused or guessing); stops the page from auto-resuming it
+  function hold(on) {
+    S.held = on;
+    if (!ctx) return;
+    if (on) ctx.suspend(); else ctx.resume();
+  }
+  function setVol(v) {
+    vol = Math.round(Math.max(0, Math.min(1, v)) * 10) / 10;
+    if (master) master.gain.setTargetAtTime(vol * 1.25, ctx.currentTime, 0.03);
+    $("volLabel").textContent = vol === 0 ? "Muted" : `Vol ${Math.round(vol * 100)}%`;
+    $("volBar").style.width = vol * 100 + "%";
+    $("volDown").disabled = vol <= 0; $("volUp").disabled = vol >= 1;
+  }
+  let ctx, master, lp1, lp2, distGain, dry, wet, mix, analyser, noiseBuf, songBus = null, schedTimer = null, customSrc = null, customBuffer = null;
+
+  function initAudio() {
+    if (ctx) return;
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    master = ctx.createGain(); master.gain.value = vol * 1.25; master.connect(ctx.destination);
+    lp1 = ctx.createBiquadFilter(); lp1.type = "lowpass"; lp1.Q.value = 0.5;
+    lp2 = ctx.createBiquadFilter(); lp2.type = "lowpass"; lp2.Q.value = 0.5;
+    distGain = ctx.createGain();
+    dry = ctx.createGain(); wet = ctx.createGain();
+    const conv = ctx.createConvolver(); conv.buffer = makeImpulse(3.2);
+    mix = ctx.createGain();
+    analyser = ctx.createAnalyser(); analyser.fftSize = 1024;
+    lp1.connect(lp2); lp2.connect(distGain);
+    distGain.connect(dry); distGain.connect(conv); conv.connect(wet);
+    dry.connect(mix); wet.connect(mix); mix.connect(analyser); analyser.connect(master);
+
+    // Ambient: soft wind / city hum that the music has to cut through
+    noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 4, ctx.sampleRate);
+    const nd = noiseBuf.getChannelData(0); let b = 0;
+    for (let i = 0; i < nd.length; i++) { b = 0.97 * b + 0.03 * (Math.random() * 2 - 1); nd[i] = b * 3.2; }
+    const amb = ctx.createBufferSource(); amb.buffer = noiseBuf; amb.loop = true;
+    const ambF = ctx.createBiquadFilter(); ambF.type = "bandpass"; ambF.frequency.value = 1100; ambF.Q.value = 0.6;
+    const lfo = ctx.createOscillator(); lfo.frequency.value = 0.08; const lfoG = ctx.createGain(); lfoG.gain.value = 400;
+    lfo.connect(lfoG); lfoG.connect(ambF.frequency); lfo.start();
+    const ambG = ctx.createGain(); ambG.gain.value = 0.075;
+    amb.connect(ambF); ambF.connect(ambG); ambG.connect(master); amb.start();
+    applyDistance(START_D, true);
+  }
+
+  function makeImpulse(secs) {
+    const len = Math.floor(ctx.sampleRate * secs), buf = ctx.createBuffer(2, len, ctx.sampleRate);
+    for (let c = 0; c < 2; c++) { const d = buf.getChannelData(c); for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.6); }
+    return buf;
+  }
+
+  function applyDistance(d, instant) {
+    const now = ctx.currentTime, k = instant ? 0.001 : 0.06;
+    // Harder: lower cutoff far away, more echo, and wind gusts that swallow the music now and then
+    const cut = 380 + 11000 * Math.exp(-d / 330);
+    const far = 1 - Math.exp(-d / 450);
+    const s = performance.now() / 1000;
+    const w = (Math.sin(s * 0.9) + Math.sin(s * 2.3 + 1) + Math.sin(s * 0.37 + 2)) / 3;
+    const gust = 1 - 0.45 * far * Math.max(0, Math.min(1, w + 0.25));
+    lp1.frequency.setTargetAtTime(cut, now, k); lp2.frequency.setTargetAtTime(cut, now, k);
+    distGain.gain.setTargetAtTime((0.2 + 0.8 * Math.exp(-d / 550)) * gust, now, instant ? 0.001 : 0.12);
+    dry.gain.setTargetAtTime(1 - 0.8 * far, now, k);
+    wet.gain.setTargetAtTime(0.1 + 0.9 * far, now, k);
+  }
+
+  const midiOf = n => { const m = /^([A-G])(#|b)?(\d)$/.exec(n); return 12 * (+m[3] + 1) + { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }[m[1]] + (m[2] === "#" ? 1 : m[2] === "b" ? -1 : 0); };
+  const hz = m => 440 * Math.pow(2, (m - 69) / 12);
+
+  function buildEvents(song) {
+    const ev = []; let t = 0;
+    song.mel.split(/\s+/).forEach(tok => {
+      const [n, durS] = tok.split(":"); const dur = durS ? parseFloat(durS) : 1;
+      if (n !== "-") ev.push({ t, k: "lead", f: hz(midiOf(n)), dur });
+      t += dur;
+    });
+    const total = Math.ceil(t / song.meter) * song.meter;
+    const roots = song.roots.split(" "), bars = total / song.meter;
+    for (let b = 0; b < bars; b++) {
+      const r = midiOf(roots[b % roots.length] + "3");
+      for (let i = 0; i < song.meter; i++) {
+        const bt = b * song.meter + i;
+        ev.push({ t: bt, k: "bass", f: hz(r - 12), dur: 0.45 });
+        ev.push({ t: bt + 0.5, k: "bass", f: hz(r - 12), dur: 0.45 });
+        if (song.ballad) {
+          ev.push({ t: bt, k: "chug", f: hz(r), dur: 0.95, acc: i === 0 });
+          if (i === 0) ev.push({ t: bt, k: "kick" });
+          if (i === 2) ev.push({ t: bt, k: "snare" });
+          ev.push({ t: bt, k: "hat" });
+        } else {
+          ev.push({ t: bt, k: "chug", f: hz(r), dur: 0.42, acc: true });
+          ev.push({ t: bt + 0.5, k: "chug", f: hz(r), dur: 0.42, acc: false });
+          if (i % 2 === 0) ev.push({ t: bt, k: "kick" });
+          if (i === 2) ev.push({ t: bt + 0.5, k: "kick" });
+          if (i % 2 === 1) ev.push({ t: bt, k: "snare" });
+          ev.push({ t: bt, k: "hat" }); ev.push({ t: bt + 0.5, k: "hat" });
+        }
+      }
+    }
+    ev.sort((a, b) => a.t - b.t);
+    return { ev, total };
+  }
+
+  function voice(e, at, spb) {
+    const out = songBus;
+    if (e.k === "lead") {
+      // lead guitar: two detuned saws into the lead overdrive, with a little vibrato on long notes
+      const g = ctx.createGain(), o1 = ctx.createOscillator(), o2 = ctx.createOscillator();
+      o1.type = "sawtooth"; o2.type = "sawtooth"; o1.frequency.value = e.f; o2.frequency.value = e.f * 1.006;
+      const len = e.dur * spb;
+      if (len > 0.5) {
+        const v = ctx.createOscillator(), vg = ctx.createGain(); v.frequency.value = 5.5; vg.gain.setValueAtTime(0, at); vg.gain.linearRampToValueAtTime(e.f * 0.012, at + len);
+        v.connect(vg); vg.connect(o1.frequency); vg.connect(o2.frequency); v.start(at); v.stop(at + len + 0.3);
+      }
+      g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(0.5, at + 0.008);
+      g.gain.setTargetAtTime(0.32, at + 0.05, 0.2);
+      g.gain.setTargetAtTime(0.0001, at + len * 0.92, 0.035);
+      o1.connect(g); o2.connect(g); g.connect(leadIn);
+      o1.start(at); o2.start(at); o1.stop(at + len + 0.4); o2.stop(at + len + 0.4);
+    } else if (e.k === "chug") {
+      // rhythm guitar: power chord (root, fifth, octave) into heavy distortion; off-beats palm-muted
+      const g = ctx.createGain(), len = e.dur * spb;
+      [1, 1.4983, 2].forEach((m, i) => { const o = ctx.createOscillator(); o.type = "sawtooth"; o.frequency.value = e.f * m; o.detune.value = i * 4 - 4; o.connect(g); o.start(at); o.stop(at + len + 0.2); });
+      const pk = e.acc ? 0.34 : 0.2;
+      g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(pk, at + 0.006);
+      g.gain.setTargetAtTime(pk * (e.acc ? 0.6 : 0.25), at + 0.02, 0.06);
+      g.gain.setTargetAtTime(0.0001, at + len * 0.85, 0.02);
+      g.connect(gtrIn);
+    } else if (e.k === "bass") {
+      const g = ctx.createGain(), o = ctx.createOscillator(); o.type = "triangle"; o.frequency.value = e.f;
+      const h = ctx.createOscillator(), hg = ctx.createGain(); h.type = "sawtooth"; h.frequency.value = e.f * 2; hg.gain.value = 0.12;
+      const len = e.dur * spb;
+      g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(0.5, at + 0.008); g.gain.setTargetAtTime(0.0001, at + len * 0.8, 0.04);
+      o.connect(g); h.connect(hg); hg.connect(g); g.connect(out); o.start(at); h.start(at); o.stop(at + len + 0.3); h.stop(at + len + 0.3);
+    } else if (e.k === "kick") {
+      const g = ctx.createGain(), o = ctx.createOscillator(); o.type = "sine";
+      o.frequency.setValueAtTime(130, at); o.frequency.exponentialRampToValueAtTime(42, at + 0.12);
+      g.gain.setValueAtTime(e.soft ? 0.35 : 0.85, at); g.gain.exponentialRampToValueAtTime(0.001, at + 0.3);
+      o.connect(g); g.connect(out); o.start(at); o.stop(at + 0.32);
+    } else if (e.k === "hat" || e.k === "snare") {
+      const s = ctx.createBufferSource(); s.buffer = noiseBuf;
+      const f = ctx.createBiquadFilter(); f.type = e.k === "hat" ? "highpass" : "bandpass"; f.frequency.value = e.k === "hat" ? 7000 : 1800;
+      const g = ctx.createGain(); const peak = e.k === "hat" ? 0.1 : 0.55, dec = e.k === "hat" ? 0.04 : 0.18;
+      g.gain.setValueAtTime(peak, at); g.gain.exponentialRampToValueAtTime(0.001, at + dec);
+      s.connect(f); f.connect(g); g.connect(out); s.start(at, Math.random() * 3); s.stop(at + dec + 0.02);
+    }
+  }
+
+  function startMusic(song) {
+    stopMusic();
+    songBus = ctx.createGain(); songBus.gain.value = 1; songBus.connect(lp1);
+    if (song.custom) {
+      customSrc = ctx.createBufferSource(); customSrc.buffer = song.buffer; customSrc.loop = true;
+      const g = ctx.createGain(); g.gain.value = 1; customSrc.connect(g); g.connect(songBus);
+      // start somewhere in the first half, but past the intro
+      const dur = song.buffer.duration, off = song.offset != null ? song.offset : Math.min(dur * 0.6, 20 + Math.random() * Math.max(0, dur * 0.35 - 20));
+      customSrc.start(ctx.currentTime + 0.05, off);
+      return;
+    }
+    // Amp chains: heavy distortion for rhythm guitar, lighter overdrive for the lead
+    const amp = (drive, outLevel, hp, lpF) => {
+      const sh = ctx.createWaveShaper(), n = 1024, c = new Float32Array(n);
+      for (let i = 0; i < n; i++) { const x = i * 2 / n - 1; c[i] = (1 + drive) * x / (1 + drive * Math.abs(x)); }
+      sh.curve = c; sh.oversample = "2x";
+      const pre = ctx.createGain(), h = ctx.createBiquadFilter(), l = ctx.createBiquadFilter(), o = ctx.createGain();
+      h.type = "highpass"; h.frequency.value = hp; l.type = "lowpass"; l.frequency.value = lpF; o.gain.value = outLevel;
+      pre.connect(sh); sh.connect(h); h.connect(l); l.connect(o); o.connect(songBus);
+      return pre;
+    };
+    gtrIn = amp(45, 0.16, 110, 3800);
+    leadIn = amp(10, 0.3, 250, 5000);
+    const { ev, total } = buildEvents(song), spb = 60 / song.bpm;
+    let loopStart = ctx.currentTime + 0.1, idx = 0;
+    const bus = songBus;
+    schedTimer = setInterval(() => {
+      if (bus !== songBus) return;
+      const horizon = ctx.currentTime + 0.25;
+      while (true) {
+        const e = ev[idx], at = loopStart + e.t * spb;
+        if (at > horizon) break;
+        voice(e, at, spb);
+        idx++;
+        if (idx >= ev.length) { idx = 0; loopStart += total * spb; }
+      }
+    }, 30);
+  }
+
+  function stopMusic() {
+    if (schedTimer) { clearInterval(schedTimer); schedTimer = null; }
+    if (customSrc) { try { customSrc.stop(); } catch (_) {} customSrc = null; }
+    if (songBus) {
+      const old = songBus; old.gain.setTargetAtTime(0, ctx.currentTime, 0.05);
+      setTimeout(() => old.disconnect(), 400); songBus = null;
+    }
+  }
+
+  // ---------- UI ----------
+  const fmt = d => Math.round(d).toLocaleString("en-US");
+  const roundScore = d => Math.round(d / 10) * 10;
+
+  function setScene() {
+    $("puzzleNo").textContent = S.label;
+    $("sceneText").innerHTML = "Somewhere out there: <b></b>";
+    $("sceneText").querySelector("b").textContent = S.scene;
+  }
+
+  function renderPips() {
+    [...$("pips").querySelectorAll(".pip")].forEach((p, i) => p.classList.toggle("used", i >= S.buzzes));
+  }
+
+  function renderDistance() {
+    $("dist").textContent = fmt(S.d);
+    const pct = (1 - S.d / START_D) * 100;
+    $("fill").style.width = pct + "%"; $("me").style.left = pct + "%";
+  }
+
+  function resetRound() {
+    S.phase = "idle"; S.t = 0; S.d = START_D; S.buzzes = BUZZES; S.log = [];
+    setScene(); renderPips(); renderDistance();
+    $("startBtn").hidden = false; $("startBtn").textContent = "Start driving";
+    $("buzzBtn").hidden = true; $("giveUp").hidden = true;
+    $("guessPanel").hidden = true; $("result").hidden = true; $("frozen").hidden = true;
+    $("pauseBtn").disabled = true; setPauseUI(false);
+  }
+
+  function setPauseUI(paused) {
+    $("icoPause").hidden = paused; $("icoPlay").hidden = !paused;
+    $("pauseLabel").textContent = paused ? "Play" : "Pause";
+    $("pauseBtn").setAttribute("aria-label", paused ? "Play" : "Pause");
+  }
+
+  function togglePause() {
+    if (S.phase === "walking") {
+      S.phase = "paused"; hold(true); setPauseUI(true);
+      $("buzzBtn").disabled = true; $("frozen").textContent = "Paused"; $("frozen").hidden = false;
+    } else if (S.phase === "paused") {
+      hold(false); S.phase = "walking"; S.last = performance.now(); setPauseUI(false);
+      $("buzzBtn").disabled = false; $("frozen").hidden = true;
+    } else if (S.phase === "done") {
+      hold(!S.held); setPauseUI(S.held);
+    }
+  }
+
+  function begin() {
+    initAudio();
+    ctx.resume().then(() => { $("audioWarn").hidden = ctx.state === "running"; }, () => { $("audioWarn").hidden = false; });
+    setTimeout(() => { if (!S.held && ctx.state !== "running") $("audioWarn").hidden = false; }, 600);
+    applyDistance(START_D, true);
+    hold(false);
+    // 2 seconds of empty road, then the music starts
+    S.phase = "intro"; S.introStart = performance.now();
+    $("pauseBtn").disabled = true; setPauseUI(false);
+    $("startBtn").hidden = true; $("buzzBtn").hidden = false; $("buzzBtn").disabled = true; $("giveUp").hidden = false;
+    $("frozen").textContent = "Music in 2"; $("frozen").hidden = false;
+  }
+
+  function startDrive() {
+    startMusic(S.song);
+    S.phase = "walking"; S.last = performance.now();
+    $("frozen").hidden = true; $("pauseBtn").disabled = false;
+    $("buzzBtn").disabled = false; $("buzzBtn").focus();
+  }
+
+  const speedAt = t => START_D * CURVE * Math.pow(Math.max(t, 0.001), CURVE - 1) / WALK_SECS * 3.6;
+
+  function buzz() {
+    if (S.phase !== "walking" || S.buzzes <= 0) return;
+    S.buzzKmh = S.kmh; S.phase = "guessing"; hold(true);
+    $("frozen").textContent = "Frozen"; $("frozen").hidden = false; $("pauseBtn").disabled = true;
+    $("buzzBtn").disabled = true;
+    $("guessPanel").hidden = false; $("guessMsg").textContent = ""; $("guessMsg").className = "msg";
+    const self = S.song.custom && !S.song.aliasesNorm.length;
+    $("guessForm").hidden = self; $("selfJudge").hidden = !self;
+    if (!self) { $("guessInput").value = ""; $("guessInput").focus(); }
+  }
+
+  const norm = s => (s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s*\([^)]*\)\s*$/, "").replace(/[^a-z0-9]/g, "").replace(/^the/, "");
+  function isRight(g) {
+    const n = norm(g); if (!n) return null;
+    return S.song.aliasesNorm.includes(n);
+  }
+
+  function wrong(msg) {
+    S.buzzes--; S.log.push("❌"); renderPips();
+    if (S.buzzes <= 0) return finish(false);
+    S.d = Math.max(0, S.d - PENALTY); S.t = tAt(S.d); applyDistance(S.d); renderDistance();
+    $("guessMsg").textContent = msg; $("guessMsg").className = "msg bad";
+    setTimeout(() => {
+      if (S.phase !== "guessing") return;
+      hold(false); S.phase = "walking"; S.last = performance.now();
+      $("pauseBtn").disabled = false; setPauseUI(false);
+      $("frozen").hidden = true; $("buzzBtn").disabled = false; $("guessPanel").hidden = true; $("buzzBtn").focus();
+    }, 1100);
+  }
+
+  function right() { S.log.push("✅"); finish(true); }
+
+  function finish(won) {
+    S.phase = "done"; hold(false);
+    $("pauseBtn").disabled = false; setPauseUI(false);
+    $("frozen").hidden = true; $("buzzBtn").hidden = true; $("buzzBtn").disabled = false; $("giveUp").hidden = true; $("guessPanel").hidden = true;
+    // Drive the rest of the way so the player hears the reveal clearly
+    S.revealFrom = S.d; S.revealStart = performance.now();
+    const score = roundScore(S.d);
+    $("result").hidden = false; $("result").classList.toggle("lost", !won);
+    $("listenLink").hidden = !S.song.link; if (S.song.link) $("listenLink").href = S.song.link;
+    $("resScore").textContent = won ? `${fmt(score)} m` : "0 m";
+    $("resTitle").textContent = won ? `You named “${S.song.title}” from ${fmt(score)} m away.` : `It was “${S.song.title}”.`;
+    $("resSub").textContent = won
+      ? (score >= 1200 ? "Bat ears. That's barely more than a bassline at this range." : score >= 600 ? "Sharp ears. Most people need to get a lot closer." : score >= 200 ? "Solid. You got it before the melody was fully clear." : "Got there in the end, right by the speakers.")
+      : "You drove right up to the speakers. Listen to it clearly now.";
+    if (S.song.decade) $("resSub").textContent += ` A ${S.song.decade}s classic.`;
+    const line = won ? `📍 ${fmt(score)} m away at ${Math.round(S.buzzKmh || 0)} km/h` : "📍 Had to stand next to the speaker";
+    $("shareText").textContent = `Earshot ${S.daily ? "#" + (dayNo + 1) : "(practice)"} 🎵\n${line}\n${S.log.join("")}`;
+    $("copyBtn").textContent = "Copy result";
+  }
+
+  $("startBtn").onclick = begin;
+  $("buzzBtn").onclick = buzz;
+  $("pauseBtn").onclick = togglePause;
+  $("volUp").onclick = () => setVol(vol + 0.1);
+  $("volDown").onclick = () => setVol(vol - 0.1);
+  $("giveUp").onclick = () => { if (S.phase === "walking" || S.phase === "guessing" || S.phase === "paused") { S.log.push("🏳️"); finish(false); } };
+  $("guessForm").onsubmit = e => {
+    e.preventDefault(); if (S.phase !== "guessing") return;
+    const r = isRight($("guessInput").value);
+    if (r === null) { $("guessMsg").textContent = "Type a song name first."; $("guessMsg").className = "msg bad"; return; }
+    r ? right() : wrong(`Not that one. You moved ${PENALTY} m closer.`);
+  };
+  $("judgeYes").onclick = () => S.phase === "guessing" && right();
+  $("judgeNo").onclick = () => S.phase === "guessing" && wrong(`You moved ${PENALTY} m closer.`);
+  document.addEventListener("pointerdown", () => { if (ctx && !S.held && ctx.state !== "running") ctx.resume().then(() => { $("audioWarn").hidden = true; }); });
+  document.addEventListener("keydown", e => {
+    if (e.code === "Space" && S.phase === "walking" && !/INPUT|BUTTON|SUMMARY/.test(document.activeElement.tagName)) { e.preventDefault(); buzz(); }
+    else if (e.code === "Space" && S.phase === "walking" && document.activeElement === $("buzzBtn")) { e.preventDefault(); buzz(); }
+  });
+  $("copyBtn").onclick = () => {
+    const txt = $("shareText").textContent;
+    const done = () => { $("copyBtn").textContent = "Copied"; };
+    const fallback = () => { const r = document.createRange(); r.selectNodeContents($("shareText")); const s = getSelection(); s.removeAllRanges(); s.addRange(r); $("copyBtn").textContent = "Selected, press Ctrl+C"; };
+    try { navigator.clipboard.writeText(txt).then(done, fallback); } catch (_) { fallback(); }
+  };
+  // ---------- Real previews (Apple Music 30-second clips) ----------
+  let previewMode = null, nextEntry = null;
+  const cache = new Map();
+  const decCtx = (() => { try { return new OfflineAudioContext(2, 44100, 44100); } catch (_) { return null; } })();
+  async function loadPreview(entry) {
+    const key = entry[0] + "|" + entry[1];
+    if (cache.has(key)) return cache.get(key);
+    const job = (async () => {
+      const ctl = new AbortController(); const to = setTimeout(() => ctl.abort(), 9000);
+      try {
+        const q = encodeURIComponent(entry[1] + " " + entry[0]);
+        const r = await fetch(`https://itunes.apple.com/search?term=${q}&entity=song&media=music&limit=15`, { signal: ctl.signal });
+        const res = ((await r.json()).results || []).filter(x => x.previewUrl);
+        const nt = norm(entry[0]), na = norm(entry[1]);
+        const score = x => (norm(x.artistName).includes(na) ? 4 : norm(x.artistName).startsWith(na.slice(0, 5)) ? 2 : 0) + (norm(x.trackName).startsWith(nt) ? 3 : 0) - (/\b(live|demo|karaoke|instrumental|tribute|cover)\b/i.test(x.trackName + " " + (x.collectionName || "")) ? 5 : 0);
+        res.sort((x, y) => score(y) - score(x));
+        if (!res.length || score(res[0]) < 6) throw new Error("no match");
+        const ab = await (await fetch(res[0].previewUrl, { signal: ctl.signal })).arrayBuffer();
+        const buffer = await decCtx.decodeAudioData(ab);
+        return { buffer, link: res[0].trackViewUrl };
+      } finally { clearTimeout(to); }
+    })();
+    cache.set(key, job);
+    job.catch(() => cache.delete(key));
+    return job;
+  }
+  const randomEntry = (not) => { let e; do { e = CLASSIC[Math.floor(Math.random() * CLASSIC.length)]; } while (not && e === not && CLASSIC.length > 1); return e; };
+  function srcNote(ok) {
+    $("srcNote").innerHTML = ok
+      ? "Real 30-second song previews, rock from the 70s to the 90s. Previews courtesy of Apple Music."
+      : "Real song previews can't load in this view, so you're hearing the built-in rock covers. Open the downloaded <b>earshot.html</b> file in your web browser to play with real songs.";
+  }
+  async function prepareRound(entry) {
+    $("startBtn").disabled = true; $("startBtn").textContent = "Loading song…";
+    try {
+      if (previewMode === false || !decCtx) throw new Error("off");
+      let p = null;
+      for (let i = 0; i < 4 && !p; i++) {
+        try { p = await loadPreview(entry); }
+        catch (err) { if (String(err).includes("no match")) entry = randomEntry(entry); else if (i >= 1) throw err; }
+      }
+      if (!p) throw new Error("none");
+      previewMode = true; srcNote(true);
+      S.entry = entry;
+      S.song = { title: `${entry[0]} (${entry[1]})`, custom: true, preview: true, buffer: p.buffer, link: p.link, offset: 0, decade: entry[2], aliasesNorm: [norm(entry[0]), norm(entry[1] + entry[0])] };
+      nextEntry = randomEntry(entry); loadPreview(nextEntry).catch(() => {});
+    } catch (_) {
+      if (previewMode !== true) { previewMode = false; srcNote(false); if (!S.song || S.song.preview) S.song = dailySong; }
+      else { $("srcNote").textContent = "That song's preview wouldn't load. Press New game to try another."; }
+    }
+    $("startBtn").disabled = false; $("startBtn").textContent = "Start driving";
+  }
+  async function newGame() {
+    if (S.song.custom && !S.song.preview && playlist.length) return $("customBtn").onclick();
+    initAudio(); ctx.resume();
+    stopMusic();
+    S.scene = SCENES[Math.floor(Math.random() * SCENES.length)];
+    S.label = "Practice"; S.daily = false;
+    if (previewMode) {
+      resetRound();
+      await prepareRound(nextEntry || randomEntry(S.entry));
+      if (S.phase === "idle") begin();
+      return;
+    }
+    const pool = SONGS.filter(s => s !== S.song);
+    S.song = pool[Math.floor(Math.random() * pool.length)];
+    resetRound(); begin();
+  }
+  function restart() { stopMusic(); resetRound(); begin(); }
+  $("practiceBtn").onclick = newGame;
+  $("newBtn").onclick = newGame;
+  $("restartBtn").onclick = restart;
+
+  // Playlist from the player's own files
+  let playlist = [], lastPick = null;
+  function parseName(fname) {
+    let base = fname.replace(/\.[^.]+$/, "").replace(/_/g, " ").replace(/^\s*\d{1,3}[\s.\-]+/, "").trim();
+    const parts = base.split(/\s+-\s+/);
+    if (parts.length >= 2) return { artist: parts[0].trim(), title: parts.slice(1).join(" - ").trim() };
+    return { artist: "", title: base };
+  }
+  $("fileInput").onchange = () => {
+    const files = [...$("fileInput").files];
+    playlist = files.map(f => ({ file: f, ...parseName(f.name) }));
+    $("customBtn").disabled = !playlist.length;
+    $("fileStatus").textContent = playlist.length ? `${playlist.length} song${playlist.length > 1 ? "s" : ""} loaded.` : "No songs loaded yet.";
+    buildList();
+  };
+  $("customBtn").onclick = async () => {
+    if (!playlist.length) return;
+    stopMusic(); initAudio(); ctx.resume();
+    const pool = playlist.length > 1 ? playlist.filter(p => p !== lastPick) : playlist;
+    const pick = pool[Math.floor(Math.random() * pool.length)]; lastPick = pick;
+    $("customBtn").disabled = true; $("fileStatus").textContent = "Loading a song…";
+    try {
+      if (!pick.buffer) pick.buffer = await ctx.decodeAudioData(await pick.file.arrayBuffer());
+    } catch (_) {
+      $("fileStatus").textContent = `Couldn't read ${pick.file.name}. Try MP3, WAV or M4A.`; $("customBtn").disabled = false; return;
+    }
+    $("customBtn").disabled = false; $("fileStatus").textContent = `${playlist.length} songs loaded.`;
+    const display = pick.artist ? `${pick.title} (${pick.artist})` : pick.title;
+    S.song = { title: display, custom: true, buffer: pick.buffer, aliasesNorm: [norm(pick.title), norm(pick.artist + pick.title)].filter(Boolean) };
+    S.scene = SCENES[Math.floor(Math.random() * SCENES.length)]; S.label = "Your playlist"; S.daily = false;
+    resetRound(); begin(); window.scrollTo({ top: 0, behavior: reduce ? "auto" : "smooth" });
+  };
+
+  SONGS.forEach(s => s.aliasesNorm = [s.title, ...s.aliases].map(norm));
+  buildList();
+
+  // ---------- Scene canvas ----------
+  const cv = $("scene"), g = cv.getContext("2d");
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let roadOff = 0, W = 0, H = 0, stars = [], rings = [], lastRing = 0, levelBuf;
+  function resize() {
+    const r = cv.getBoundingClientRect(), dpr = Math.min(2, devicePixelRatio || 1);
+    W = r.width; H = r.height; cv.width = W * dpr; cv.height = H * dpr; g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    stars = Array.from({ length: Math.round(W / 9) }, () => ({ x: Math.random() * W, y: Math.random() * H * 0.55, r: Math.random() * 1.2 + 0.3, p: Math.random() * 6 }));
+  }
+  addEventListener("resize", resize); resize();
+
+  function level() {
+    if (!analyser) return 0;
+    levelBuf = levelBuf || new Float32Array(analyser.fftSize);
+    analyser.getFloatTimeDomainData(levelBuf);
+    let s = 0; for (let i = 0; i < levelBuf.length; i++) s += levelBuf[i] * levelBuf[i];
+    return Math.sqrt(s / levelBuf.length);
+  }
+
+  function draw(now) {
+    const hy = H * 0.58, vx = W * 0.62;
+    const sky = g.createLinearGradient(0, 0, 0, hy);
+    sky.addColorStop(0, "#0d1122"); sky.addColorStop(1, "#2a2a55");
+    g.fillStyle = sky; g.fillRect(0, 0, W, hy);
+    stars.forEach(s => { g.globalAlpha = 0.35 + 0.35 * Math.sin(now / 900 + s.p); g.fillStyle = "#ecebf5"; g.beginPath(); g.arc(s.x, s.y, s.r, 0, 7); g.fill(); });
+    g.globalAlpha = 1;
+    // distant skyline
+    g.fillStyle = "#161b36";
+    for (let x = 0, i = 0; x < W; i++) { const w = 14 + ((i * 37) % 23), h = 6 + ((i * 53) % 19); g.fillRect(x, hy - h, w, h); x += w + 2; }
+    const gr = g.createLinearGradient(0, hy, 0, H); gr.addColorStop(0, "#151a33"); gr.addColorStop(1, "#0b0e1c");
+    g.fillStyle = gr; g.fillRect(0, hy, W, H - hy);
+    // road
+    g.fillStyle = "#1d2342"; g.beginPath(); g.moveTo(vx - 3, hy); g.lineTo(vx + 3, hy); g.lineTo(W * 0.95, H); g.lineTo(W * 0.3, H); g.closePath(); g.fill();
+    g.strokeStyle = "rgba(255,181,71,.35)"; g.setLineDash([10, 14]); g.lineDashOffset = -roadOff % 24; g.lineWidth = 1.5;
+    g.beginPath(); g.moveTo(vx, hy); g.lineTo(W * 0.625, H); g.stroke(); g.setLineDash([]);
+
+    // source position by perspective
+    const f = 60 / (60 + S.d);
+    const sx = vx + (W * 0.625 - vx) * f * 0.75, sy = hy + (H - hy) * f * 0.75;
+    const lv = level();
+    if (!reduce && (S.phase === "walking" || S.phase === "guessing" || S.phase === "done") && now - lastRing > 380 && lv > 0.01) {
+      rings.push({ x: sx, y: sy, t: now, a: Math.min(1, lv * 6) }); lastRing = now;
+    }
+    rings = rings.filter(r => now - r.t < 2200);
+    rings.forEach(r => {
+      const k = (now - r.t) / 2200;
+      g.strokeStyle = `rgba(255,181,71,${(1 - k) * 0.5 * r.a})`; g.lineWidth = 1.5;
+      g.beginPath(); g.ellipse(r.x, r.y, 8 + k * W * 0.45, (8 + k * W * 0.45) * 0.38, 0, 0, 7); g.stroke();
+    });
+    const rad = 2.5 + 46 * f;
+    const glow = g.createRadialGradient(sx, sy, 0, sx, sy, rad * 5 + 10);
+    glow.addColorStop(0, "rgba(255,181,71,.55)"); glow.addColorStop(1, "rgba(255,181,71,0)");
+    g.fillStyle = glow; g.beginPath(); g.arc(sx, sy, rad * 5 + 10, 0, 7); g.fill();
+    g.fillStyle = "#ffd28a"; g.beginPath(); g.arc(sx, sy, rad * (1 + lv * 1.5), 0, 7); g.fill();
+  }
+
+  function frame(now) {
+    if (S.phase === "intro") {
+      const k = (now - S.introStart) / INTRO_MS;
+      S.kmh = speedAt(0.03) * Math.min(1, k);
+      $("frozen").textContent = `Music in ${Math.max(1, Math.ceil((1 - k) * INTRO_MS / 1000))}`;
+      if (k >= 1) startDrive();
+    } else if (S.phase === "walking") {
+      S.kmh = speedAt(S.t);
+      const dt = Math.max(0, Math.min(0.25, (now - S.last) / 1000)); S.last = Math.max(S.last, now);
+      S.t = Math.max(0, Math.min(1, S.t + dt / WALK_SECS)); S.d = dAt(S.t);
+      applyDistance(S.d); renderDistance();
+    } else if (S.phase === "done" && ctx && S.revealFrom > 0) {
+      const k = Math.min(1, (now - S.revealStart) / 2500);
+      S.d = S.revealFrom * (1 - k); applyDistance(S.d);
+      $("fill").style.width = (1 - S.d / START_D) * 100 + "%"; $("me").style.left = (1 - S.d / START_D) * 100 + "%";
+    }
+    if (S.phase !== "intro" && S.phase !== "walking") S.kmh = S.phase === "done" ? S.kmh * 0.96 : 0;
+    $("speed").textContent = Math.round(S.kmh || 0);
+    roadOff += (S.kmh || 0) * 0.004;
+    draw(now);
+    requestAnimationFrame(frame);
+  }
+
+  resetRound(); setVol(vol);
+  prepareRound(CLASSIC[(dayNo * 7 + 3) % CLASSIC.length]);
+  requestAnimationFrame(frame);
+})();
+</script>
