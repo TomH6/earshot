@@ -5,6 +5,39 @@ The version name is also shown at the bottom of the game page, so you can check 
 
 ---
 
+## v1.9 "Fireworks" (2026-10-10)
+
+**Changes: celebrations that grow with the score**
+
+| Distance | Banner | Effects |
+|---|---|---|
+| under 200 m | "Got it!" | Single chime, spark burst at the score |
+| 200 m+ | "Nice ears!" | Two-note chime, confetti cannons from both corners, small shake |
+| 500 m+ | "Sharp ears!" | Four-note fanfare, big confetti, 2 fireworks, shake |
+| 900 m+ | "BAT EARS!" | Six-note fanfare, huge confetti, 6 fireworks with sparkle sounds, glowing banner, double shake |
+
+The score also counts up from 0 (slower for bigger scores). With "reduce motion" switched on in the device settings, only the banner and chime play.
+
+**Changes: less dead time at the start**
+- Road intro before the music cut from 2 s to 1 s.
+- The far end is now faintly audible: muffled, but louder (base level 0.2 → 0.38, less echo-only sound, filter floor 380 → 600 Hz).
+- Previews now start where the song reaches its normal loudness, skipping slow fade-ins as well as silence (up to 8 s).
+
+**Tests** (headless Chrome, simulated Apple Music, fast test drive so all distances are reachable)
+
+| Test | Expected | Result |
+|---|---|---|
+| Intro before buzzing is possible | About 1 s | Pass |
+| Preview with 0.5 s silence + 3 s fade-in | Starts around 2.2 s (where it reaches normal loudness) | Pass: 2.20 s |
+| Win at 1,300 m | "BAT EARS!", double shake, fireworks | Pass (screenshot checked) |
+| Win at 700 m | "Sharp ears!", shake | Pass |
+| Win at 350 m | "Nice ears!", no shake | Pass (after a fix: leftover shake from the previous round) |
+| Win at 110 m | "Got it!", spark burst | Pass (screenshot checked) |
+| Score count-up ends on the real score | Exact score | Pass |
+| Script errors | None | Pass: none |
+
+---
+
 ## v1.8 "Full Volume" (2026-10-10)
 
 **Changes**

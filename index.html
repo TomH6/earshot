@@ -104,6 +104,18 @@ input[type=text] { flex: 1 1 220px; min-width: 0; font: inherit; color: var(--in
 .lb .nm { max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
 .lb .val { float: right; font-family: var(--f-num); font-variant-numeric: tabular-nums; color: var(--lamp); }
 .lb li.mine .nm { color: var(--lamp); font-weight: 600; }
+.banner { position: fixed; left: 50%; top: 32%; transform: translate(-50%, -50%) scale(.4); z-index: 31; pointer-events: none; opacity: 0;
+  font-family: var(--f-display); font-weight: 800; letter-spacing: -.02em; color: var(--lamp); white-space: nowrap; text-shadow: 0 4px 30px rgba(0,0,0,.6), 0 0 24px rgba(255,181,71,.45); }
+.banner.t0 { font-size: 2rem; } .banner.t1 { font-size: 2.8rem; } .banner.t2 { font-size: 3.6rem; } .banner.t3 { font-size: clamp(3rem, 14vw, 5.5rem); color: #fff; text-shadow: 0 0 30px var(--lamp), 0 0 60px #ff8fb1, 0 4px 30px rgba(0,0,0,.6); }
+.banner.show { animation: pop 1.9s cubic-bezier(.2,1.6,.4,1) forwards; }
+.banner.t3.show { animation: pop 2.6s cubic-bezier(.2,1.6,.4,1) forwards, glow .35s ease-in-out 4 alternate; }
+@keyframes pop { 0% { opacity: 0; transform: translate(-50%, -50%) scale(.4) rotate(-6deg); } 18% { opacity: 1; transform: translate(-50%, -50%) scale(1.08) rotate(2deg); } 30% { transform: translate(-50%, -50%) scale(1) rotate(0); } 80% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -60%) scale(1); } }
+@keyframes glow { from { filter: brightness(1); } to { filter: brightness(1.5); } }
+#fx { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 30; }
+.stage.shake { animation: shake .45s ease-out; }
+.stage.shake-big { animation: shake .7s ease-out 2; }
+@keyframes shake { 0%,100% { transform: none; } 15% { transform: translate(-6px, 2px) rotate(-.6deg); } 30% { transform: translate(5px, -3px) rotate(.5deg); } 45% { transform: translate(-4px, 2px); } 60% { transform: translate(3px, -1px); } 80% { transform: translate(-1px, 1px); } }
+@media (prefers-reduced-motion: reduce) { .banner.show, .banner.t3.show { animation: fadeonly 2s forwards; transform: translate(-50%, -50%); } @keyframes fadeonly { 0%, 80% { opacity: 1; } 100% { opacity: 0; } } }
 .score { font-family: var(--f-num); font-weight: 600; font-size: 3rem; color: var(--lamp); line-height: 1; font-variant-numeric: tabular-nums; }
 .result.lost .score { color: var(--muted); }
 pre.share { margin: 0; font-family: var(--f-num); font-size: .9rem; background: var(--night); border: 1px solid var(--line); border-radius: 10px; padding: 12px; white-space: pre-wrap; user-select: all; }
@@ -221,7 +233,7 @@ input[type=file] { font: inherit; color: var(--muted); max-width: 100%; }
   <details open>
     <summary>How to play</summary>
     <ul class="how" style="margin-top:12px">
-      <li>You drive at about 104 km/h toward a song playing 1.4 km away. The music kicks in after 2 seconds on the road, and the drive takes under 50 seconds.</li>
+      <li>You drive at about 104 km/h toward a song playing 1.4 km away. The music kicks in after 1 second on the road, and the drive takes under 50 seconds.</li>
       <li>Far away you mostly hear the bass and the echo. Up close the melody comes through.</li>
       <li>Buzz the moment you recognize it. The distance freezes while you type.</li>
       <li>The music stops while you guess. A wrong guess moves you 150 m closer. You get 3 buzzes.</li>
@@ -232,6 +244,8 @@ input[type=file] { font: inherit; color: var(--muted); max-width: 100%; }
   </details>
 </div>
 
+<canvas id="fx" aria-hidden="true"></canvas>
+<div class="banner" id="banner" aria-live="polite"></div>
 <datalist id="songList"></datalist>
 
 <script>
@@ -317,14 +331,14 @@ input[type=file] { font: inherit; color: var(--muted); max-width: 100%; }
 
   // ---------- Game constants ----------
   const DRIVE_KMH = 90 * 1.15; // 103.5 km/h
-  const START_D = 1400, WALK_SECS = START_D / (DRIVE_KMH / 3.6), CURVE = 1, INTRO_MS = 2000, PENALTY = 150, BUZZES = 3;
+  const START_D = 1400, WALK_SECS = START_D / (DRIVE_KMH / 3.6), CURVE = 1, INTRO_MS = 1000, PENALTY = 150, BUZZES = 3;
   const dAt = t => START_D * (1 - Math.pow(Math.min(1, t), CURVE));
   const tAt = d => Math.pow(Math.max(0, 1 - d / START_D), 1 / CURVE);
 
   const S = { phase: "idle", t: 0, d: START_D, buzzes: BUZZES, log: [], song: dailySong, scene: dailyScene, label: "Free play", daily: false };
   // Dev mode: a new random song on every refresh. Set to false at launch for one daily song for everyone.
   // Override with #daily or #dev at the end of the address to try either mode.
-  const VERSION = 'v1.8 "Full Volume"';
+  const VERSION = 'v1.9 "Fireworks"';
   const START_HASH = location.hash;
   const DEV_MODE = START_HASH === "#daily" ? false : START_HASH === "#dev" ? true : true;
   // #daily / #dev apply to this one load only: clear them so the next refresh is back to normal
@@ -383,14 +397,14 @@ input[type=file] { font: inherit; color: var(--muted); max-width: 100%; }
   function applyDistance(d, instant) {
     const now = ctx.currentTime, k = instant ? 0.001 : 0.06;
     // Harder: lower cutoff far away, more echo, and wind gusts that swallow the music now and then
-    const cut = 380 + 11000 * Math.exp(-d / 330);
+    const cut = 600 + 11000 * Math.exp(-d / 330); // floor raised in v1.9 so the far end is faintly audible
     const far = 1 - Math.exp(-d / 450);
     const s = performance.now() / 1000;
     const w = (Math.sin(s * 0.9) + Math.sin(s * 2.3 + 1) + Math.sin(s * 0.37 + 2)) / 3;
     const gust = 1 - 0.22 * far * Math.max(0, Math.min(1, w + 0.25));
     lp1.frequency.setTargetAtTime(cut, now, k); lp2.frequency.setTargetAtTime(cut, now, k);
-    distGain.gain.setTargetAtTime((0.2 + 0.8 * Math.exp(-d / 550)) * gust, now, instant ? 0.001 : 0.12);
-    dry.gain.setTargetAtTime(1 - 0.8 * far, now, k);
+    distGain.gain.setTargetAtTime((0.38 + 0.62 * Math.exp(-d / 550)) * gust, now, instant ? 0.001 : 0.12);
+    dry.gain.setTargetAtTime(1 - 0.65 * far, now, k);
     wet.gain.setTargetAtTime(0.1 + 0.9 * far, now, k);
   }
 
@@ -584,7 +598,7 @@ input[type=file] { font: inherit; color: var(--muted); max-width: 100%; }
     S.phase = "intro"; S.introStart = performance.now();
     $("pauseBtn").disabled = true; setPauseUI(false);
     $("startBtn").hidden = true; $("buzzBtn").hidden = false; $("buzzBtn").disabled = true; $("giveUp").hidden = false;
-    $("frozen").textContent = "Music in 2"; $("frozen").hidden = false;
+    $("frozen").textContent = "Music in 1"; $("frozen").hidden = false;
   }
 
   function startDrive() {
@@ -627,7 +641,98 @@ input[type=file] { font: inherit; color: var(--muted); max-width: 100%; }
     }, 1100);
   }
 
-  function right() { S.log.push("✅"); finish(true); }
+  // ---------- Celebrations: bigger as the score gets better ----------
+  // Tier 1 (<200 m): a ding and a few sparks. Tier 2 (200+): confetti cannon. Tier 3 (500+): big confetti, banner, fanfare.
+  // Tier 4 (900+): fireworks, screen shake, the works.
+  const TIERS = [
+    { min: 0,   name: "Got it!",     parts: 40,  bursts: 0, notes: [76] },
+    { min: 200, name: "Nice ears!",  parts: 110, bursts: 0, notes: [72, 79] },
+    { min: 500, name: "Sharp ears!", parts: 220, bursts: 2, notes: [72, 76, 79, 84] },
+    { min: 900, name: "BAT EARS!",   parts: 320, bursts: 6, notes: [72, 76, 79, 84, 88, 91] }
+  ];
+  const FX_COLORS = ["#ffb547", "#72d9a6", "#7aa2ff", "#ff8fb1", "#ffffff", "#ffd28a"];
+  let fxParts = [], fxRunning = false, fxTimers = [];
+
+  function fanfare(notes, big) {
+    if (!ctx) return;
+    const out = ctx.createGain(); out.gain.value = 0.22; out.connect(master);
+    notes.forEach((m, i) => {
+      const t = ctx.currentTime + 0.05 + i * (big ? 0.09 : 0.12), len = i === notes.length - 1 ? 0.9 : 0.25;
+      [1, 2].forEach((h, k) => {
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.type = k ? "sine" : "triangle"; o.frequency.value = 440 * Math.pow(2, (m - 69) / 12) * h;
+        g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(k ? 0.15 : 0.5, t + 0.01); g.gain.exponentialRampToValueAtTime(0.001, t + len);
+        o.connect(g); g.connect(out); o.start(t); o.stop(t + len + 0.05);
+      });
+    });
+  }
+
+  function celebrate(score) {
+    let tier = 0; TIERS.forEach((t, i) => { if (score >= t.min) tier = i; });
+    const T = TIERS[tier];
+    fanfare(T.notes, tier >= 3);
+    // Banner
+    const b = $("banner"); b.textContent = T.name; b.className = "banner t" + tier;
+    void b.offsetWidth; b.classList.add("show");
+    // Score counts up
+    const sc = $("resScore"), t0 = performance.now(), dur = 500 + tier * 300;
+    const tick = now => { const k = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - k, 3); sc.textContent = `${fmt(Math.round(score * e / 10) * 10)} m`; if (k < 1) requestAnimationFrame(tick); };
+    requestAnimationFrame(tick);
+    if (reduce) return;
+    // Shake for the top tiers
+    const st = document.querySelector(".stage"); st.classList.remove("shake", "shake-big");
+    if (tier >= 2) { void st.offsetWidth; st.classList.add(tier >= 3 ? "shake-big" : "shake"); }
+    // Confetti cannons from both bottom corners (tier 0 = a small spark burst from the result)
+    const W = innerWidth, H = innerHeight;
+    if (tier === 0) {
+      const r = $("resScore").getBoundingClientRect(); burst(r.left + 60, r.top + 20, T.parts, 5, 0.6);
+    } else {
+      for (let i = 0; i < T.parts; i++) {
+        const left = i % 2 === 0, a = (left ? -60 : -120) * Math.PI / 180 + (Math.random() - 0.5) * 0.7, v = 11 + Math.random() * (7 + tier * 3);
+        fxParts.push(confetto(left ? 0 : W, H, Math.cos(a) * v, Math.sin(a) * v));
+      }
+    }
+    // Fireworks
+    fxTimers.forEach(clearTimeout); fxTimers = [];
+    for (let i = 0; i < T.bursts; i++) fxTimers.push(setTimeout(() => {
+      burst(W * (0.2 + Math.random() * 0.6), H * (0.12 + Math.random() * 0.3), 70, 7, 1);
+      if (ctx && i % 2 === 0) fanfare([96 + (i % 3) * 3], false);
+    }, 350 + i * 380));
+    runFx();
+  }
+  function confetto(x, y, vx, vy) {
+    return { x, y, vx, vy, w: 6 + Math.random() * 6, h: 3 + Math.random() * 5, rot: Math.random() * 6, vr: (Math.random() - 0.5) * 0.4, c: FX_COLORS[Math.floor(Math.random() * FX_COLORS.length)], life: 1, fade: 0.004 + Math.random() * 0.003, kind: "c" };
+  }
+  function burst(x, y, n, speed, life) {
+    const c = FX_COLORS[Math.floor(Math.random() * FX_COLORS.length)];
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2, v = speed * (0.4 + Math.random() * 0.6);
+      fxParts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, r: 1.5 + Math.random() * 1.8, c: Math.random() < 0.7 ? c : "#ffffff", life, fade: 0.012 + Math.random() * 0.01, kind: "s" });
+    }
+    runFx();
+  }
+  function runFx() {
+    if (fxRunning) return; fxRunning = true;
+    const cv2 = $("fx"), g2 = cv2.getContext("2d"), dpr = Math.min(2, devicePixelRatio || 1);
+    cv2.width = innerWidth * dpr; cv2.height = innerHeight * dpr; g2.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const step = () => {
+      g2.clearRect(0, 0, innerWidth, innerHeight);
+      fxParts = fxParts.filter(p => p.life > 0 && p.y < innerHeight + 40);
+      fxParts.forEach(p => {
+        if (p.kind === "c") { p.vy += 0.28; p.vx *= 0.985; p.vy *= 0.985; p.rot += p.vr; }
+        else { p.vy += 0.06; p.vx *= 0.97; p.vy *= 0.97; }
+        p.x += p.vx; p.y += p.vy; p.life -= p.fade;
+        g2.globalAlpha = Math.max(0, Math.min(1, p.life * 1.5)); g2.fillStyle = p.c;
+        if (p.kind === "c") { g2.save(); g2.translate(p.x, p.y); g2.rotate(p.rot); g2.fillRect(-p.w / 2, -p.h / 2, p.w, p.h * Math.abs(Math.cos(p.rot * 2))); g2.restore(); }
+        else { g2.beginPath(); g2.arc(p.x, p.y, p.r, 0, 7); g2.fill(); }
+      });
+      g2.globalAlpha = 1;
+      if (fxParts.length) requestAnimationFrame(step); else { fxRunning = false; g2.clearRect(0, 0, innerWidth, innerHeight); }
+    };
+    requestAnimationFrame(step);
+  }
+
+  function right() { S.log.push("✅"); finish(true); celebrate(roundScore(S.d)); }
 
   function finish(won, reason) {
     S.phase = "done"; hold(false);
@@ -738,9 +843,14 @@ input[type=file] { font: inherit; color: var(--muted); max-width: 100%; }
       : "Real song previews can't load in this view, so you're hearing the built-in rock covers. Open the downloaded <b>earshot.html</b> file in your web browser to play with real songs.";
   }
   // Skip the quiet fade-in at the start of a preview so the music is there from the first second
+  // Start where the preview reaches its normal loudness: skips silence and slow fade-ins (up to 8 s)
   function skipFadeIn(buf) {
-    const d = buf.getChannelData(0), lim = Math.min(d.length, buf.sampleRate * 6);
-    for (let i = 0; i < lim; i++) if (Math.abs(d[i]) > 0.08) return Math.max(0, i / buf.sampleRate - 0.05);
+    const d = buf.getChannelData(0), win = Math.floor(buf.sampleRate * 0.05), rms = [];
+    for (let i = 0; i + win <= d.length; i += win) { let s = 0; for (let j = i; j < i + win; j++) s += d[j] * d[j]; rms.push(Math.sqrt(s / win)); }
+    if (!rms.length) return 0;
+    const sorted = [...rms].sort((a, b) => a - b), median = sorted[Math.floor(sorted.length / 2)];
+    const lim = Math.min(rms.length, Math.round(8 / 0.05));
+    for (let k = 0; k < lim; k++) if (rms[k] >= median * 0.6) return Math.max(0, k * 0.05 - 0.1);
     return 0;
   }
   // Run log: every song the game loads is recorded in this browser; see log.html
