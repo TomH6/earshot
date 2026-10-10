@@ -47,7 +47,10 @@ header { display: flex; justify-content: space-between; align-items: flex-end; g
 .track .fill { position: absolute; left: 0; top: 10px; height: 4px; background: var(--lamp); border-radius: 4px; width: 0; }
 .track .me { position: absolute; top: 4px; width: 16px; height: 16px; margin-left: -8px; border-radius: 50%; background: var(--ink); box-shadow: 0 0 0 4px var(--night); left: 0; }
 .track .spk { position: absolute; right: -2px; top: 2px; width: 20px; height: 20px; border-radius: 4px; background: var(--lamp); box-shadow: 0 0 14px var(--lamp); }
-.ticks { position: absolute; left: 0; right: 0; top: 20px; display: flex; justify-content: space-between; font-family: var(--f-num); font-size: .7rem; color: var(--muted); }
+.ticks { position: absolute; left: 0; right: 0; top: 20px; height: 14px; font-family: var(--f-num); font-size: .7rem; color: var(--muted); }
+.ticks span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+.ticks span:first-child { transform: none; }
+.ticks span:last-child { transform: translateX(-100%); }
 
 .controls { display: grid; gap: 12px; }
 .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
@@ -106,7 +109,7 @@ input[type=file] { font: inherit; color: var(--muted); max-width: 100%; }
   <div class="stage">
     <canvas id="scene" aria-hidden="true"></canvas>
     <div class="scene" id="sceneText">Somewhere out there: <b>…</b></div>
-    <div class="readout"><span class="num" id="dist">2,000</span><span class="unit">m</span></div>
+    <div class="readout"><span class="num" id="dist">1,400</span><span class="unit">m</span></div>
     <div class="frozen" id="frozen" hidden>Frozen</div>
     <div class="speedo"><span id="speed">0</span> km/h</div>
   </div>
@@ -114,7 +117,7 @@ input[type=file] { font: inherit; color: var(--muted); max-width: 100%; }
   <div class="track" aria-hidden="true">
     <div class="rail"></div><div class="fill" id="fill"></div>
     <div class="spk"></div><div class="me" id="me"></div>
-    <div class="ticks"><span>2 km</span><span>1.5 km</span><span>1 km</span><span>500 m</span><span>here</span></div>
+    <div class="ticks"><span style="left:0">1.4 km</span><span style="left:28.57%">1 km</span><span style="left:64.29%">500 m</span><span style="left:100%">here</span></div>
   </div>
 
   <div class="controls">
@@ -130,7 +133,7 @@ input[type=file] { font: inherit; color: var(--muted); max-width: 100%; }
         <svg id="icoPlay" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" hidden><path d="M7 5l12 7-12 7z" fill="currentColor"/></svg>
         <span id="pauseLabel">Pause</span>
       </button>
-      <button id="restartBtn" class="tbtn" aria-label="Restart this song from 2 km" title="Restart this song from 2 km">
+      <button id="restartBtn" class="tbtn" aria-label="Restart this song from 1.4 km" title="Restart this song from 1.4 km">
         <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M5 12a7 7 0 1 0 2.05-4.95" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M4 4v5h5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <span>Restart</span>
       </button>
@@ -191,12 +194,13 @@ input[type=file] { font: inherit; color: var(--muted); max-width: 100%; }
   <details open>
     <summary>How to play</summary>
     <ul class="how" style="margin-top:12px">
-      <li>You drive toward a song playing 2 km away. The music kicks in after 2 seconds on the road, and the whole drive takes 30 seconds.</li>
+      <li>You drive at 90 km/h toward a song playing 1.4 km away. The music kicks in after 2 seconds on the road, and the drive takes under a minute.</li>
       <li>Far away you mostly hear the bass and the echo. Up close the melody comes through.</li>
       <li>Buzz the moment you recognize it. The distance freezes while you type.</li>
       <li>The music stops while you guess. A wrong guess moves you 150 m closer. You get 3 buzzes.</li>
       <li>Wind gusts come and go, so listen for the gaps.</li>
     </ul>
+    <p class="hint" style="margin:0">Earshot v1.1 "Short Road"</p>
     <p class="hint">The built-in songs are public-domain classics, played as 90s-style rock covers by a built-in band. No files needed.</p>
   </details>
 </div>
@@ -285,7 +289,7 @@ input[type=file] { font: inherit; color: var(--muted); max-width: 100%; }
   const dailyScene = SCENES[(dayNo * 5 + 1) % SCENES.length];
 
   // ---------- Game constants ----------
-  const START_D = 2000, WALK_SECS = 30, CURVE = 1.2, INTRO_MS = 2000, PENALTY = 150, BUZZES = 3;
+  const START_D = 1400, WALK_SECS = 56, CURVE = 1, INTRO_MS = 2000, PENALTY = 150, BUZZES = 3;
   const dAt = t => START_D * (1 - Math.pow(Math.min(1, t), CURVE));
   const tAt = d => Math.pow(Math.max(0, 1 - d / START_D), 1 / CURVE);
 
@@ -599,7 +603,7 @@ input[type=file] { font: inherit; color: var(--muted); max-width: 100%; }
     $("resScore").textContent = won ? `${fmt(score)} m` : "0 m";
     $("resTitle").textContent = won ? `You named “${S.song.title}” from ${fmt(score)} m away.` : `It was “${S.song.title}”.`;
     $("resSub").textContent = won
-      ? (score >= 1200 ? "Bat ears. That's barely more than a bassline at this range." : score >= 600 ? "Sharp ears. Most people need to get a lot closer." : score >= 200 ? "Solid. You got it before the melody was fully clear." : "Got there in the end, right by the speakers.")
+      ? (score >= 900 ? "Bat ears. That's barely more than a bassline at this range." : score >= 500 ? "Sharp ears. Most people need to get a lot closer." : score >= 200 ? "Solid. You got it before the melody was fully clear." : "Got there in the end, right by the speakers.")
       : "You drove right up to the speakers. Listen to it clearly now.";
     if (S.song.decade) $("resSub").textContent += ` A ${S.song.decade}s classic.`;
     const line = won ? `📍 ${fmt(score)} m away at ${Math.round(S.buzzKmh || 0)} km/h` : "📍 Had to stand next to the speaker";
@@ -664,6 +668,12 @@ input[type=file] { font: inherit; color: var(--muted); max-width: 100%; }
       ? "Real 30-second song previews, rock from the 70s to the 90s. Previews courtesy of Apple Music."
       : "Real song previews can't load in this view, so you're hearing the built-in rock covers. Open the downloaded <b>earshot.html</b> file in your web browser to play with real songs.";
   }
+  // Skip the quiet fade-in at the start of a preview so the music is there from the first second
+  function skipFadeIn(buf) {
+    const d = buf.getChannelData(0), lim = Math.min(d.length, buf.sampleRate * 6);
+    for (let i = 0; i < lim; i++) if (Math.abs(d[i]) > 0.08) return Math.max(0, i / buf.sampleRate - 0.05);
+    return 0;
+  }
   async function prepareRound(entry) {
     $("startBtn").disabled = true; $("startBtn").textContent = "Loading song…";
     try {
@@ -676,7 +686,7 @@ input[type=file] { font: inherit; color: var(--muted); max-width: 100%; }
       if (!p) throw new Error("none");
       previewMode = true; srcNote(true);
       S.entry = entry;
-      S.song = { title: `${entry[0]} (${entry[1]})`, custom: true, preview: true, buffer: p.buffer, link: p.link, offset: 0, decade: entry[2], aliasesNorm: [norm(entry[0]), norm(entry[1] + entry[0])] };
+      S.song = { title: `${entry[0]} (${entry[1]})`, custom: true, preview: true, buffer: p.buffer, link: p.link, offset: skipFadeIn(p.buffer), decade: entry[2], aliasesNorm: [norm(entry[0]), norm(entry[1] + entry[0])] };
       nextEntry = randomEntry(entry); loadPreview(nextEntry).catch(() => {});
     } catch (_) {
       if (previewMode !== true) { previewMode = false; srcNote(false); if (!S.song || S.song.preview) S.song = dailySong; }

@@ -1,0 +1,53 @@
+# Earshot test log
+
+Each version gets a name, a list of what changed, and the results of the tests run before it was pushed.
+The version name is also shown at the bottom of the game page, so you can check which version is live.
+
+---
+
+## v1.1 "Short Road" (2026-10-10)
+
+**Changes**
+- Starting distance cut from 2 km to 1.4 km.
+- Steady driving speed of 90 km/h (was accelerating, averaging about 240 km/h). The drive now takes about 56 seconds.
+- Quiet fade-ins at the start of song previews are skipped, so the music is audible from the first second.
+- Distance markers under the road redrawn for 1.4 km (1.4 km, 1 km, 500 m, here), placed to scale.
+- Score comments rescaled to the shorter road (900 m / 500 m / 200 m).
+
+**Tests** (headless Chrome, with Apple Music responses simulated)
+
+| Test | Expected | Result |
+|---|---|---|
+| Distance before start | 1,400 m | Pass: 1,400 m |
+| Speedometer while driving | 90 km/h, constant | Pass: 90 km/h at 3 s and at 13 s |
+| Distance after 2 s intro + 1 s of driving | about 1,375 m | Pass: 1,375 m |
+| Distance after 11 s of driving | about 1,125 m | Pass: 1,124 m |
+| Preview that starts with 2 s of silence | Playback starts at about 2 s | Pass: starts at 1.95 s |
+| Road markers line up with the distance | 1 km and 500 m at scale | Pass (checked on screenshot) |
+| Script errors | None | Pass: none |
+
+---
+
+## v1.0 "First Drive" (2026-10-10), first version on GitHub Pages
+
+**Features**
+- Song drifts in from far away: muffled, echoey, wind gusts; clears up as you get closer.
+- Buzz to freeze the distance and guess; music stops while guessing. Wrong guess = 150 m closer, 3 buzzes.
+- Controls: Pause/Play, volume, Restart, New game. 2-second road intro before the music.
+- Real 30-second song previews from Apple Music (70 rock songs, 70s to 90s), with built-in rock covers as fallback.
+
+**Tests**
+
+| Test | Result |
+|---|---|
+| Apple search and previews reachable from a real browser, audio decodes for effects | Pass |
+| Deezer API reachable from a browser | Fail: blocked by Deezer (needs a relay server) |
+| Song catalog matching on Apple Music | 62 of 70 matched; 5 test errors were Apple rate-limiting the rapid test; 3 songs with no usable preview replaced (You Oughta Know, Killing in the Name, Man in the Box) |
+| Fallback to built-in songs when Apple is unreachable | Pass |
+| Start, drive, buzz, wrong guess penalty | Pass |
+| Pause stops music and distance; play resumes | Pass |
+| Music stops during guessing, resumes after a wrong guess | Pass |
+| Restart and New game | Pass |
+
+**Fixed along the way**
+- Game froze on start (first frame produced an invalid distance). Fixed before v1.0.
