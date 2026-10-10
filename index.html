@@ -200,7 +200,7 @@ input[type=file] { font: inherit; color: var(--muted); max-width: 100%; }
       <li>The music stops while you guess. A wrong guess moves you 150 m closer. You get 3 buzzes.</li>
       <li>Wind gusts come and go, so listen for the gaps.</li>
     </ul>
-    <p class="hint" style="margin:0">Earshot v1.1 "Short Road"</p>
+    <p class="hint" style="margin:0">Earshot v1.2 "No Repeats"</p>
     <p class="hint">The built-in songs are public-domain classics, played as 90s-style rock covers by a built-in band. No files needed.</p>
   </details>
 </div>
@@ -293,7 +293,7 @@ input[type=file] { font: inherit; color: var(--muted); max-width: 100%; }
   const dAt = t => START_D * (1 - Math.pow(Math.min(1, t), CURVE));
   const tAt = d => Math.pow(Math.max(0, 1 - d / START_D), 1 / CURVE);
 
-  const S = { phase: "idle", t: 0, d: START_D, buzzes: BUZZES, log: [], song: dailySong, scene: dailyScene, label: `Daily #${dayNo + 1}`, daily: true };
+  const S = { phase: "idle", t: 0, d: START_D, buzzes: BUZZES, log: [], song: dailySong, scene: dailyScene, label: "Free play", daily: false };
 
   // ---------- Audio ----------
   let gtrIn, leadIn, vol = 0.8;
@@ -517,6 +517,7 @@ input[type=file] { font: inherit; color: var(--muted); max-width: 100%; }
     $("buzzBtn").hidden = true; $("giveUp").hidden = true;
     $("guessPanel").hidden = true; $("result").hidden = true; $("frozen").hidden = true;
     $("pauseBtn").disabled = true; setPauseUI(false);
+    clearTimeout(S.endTimer); clearTimeout(S.endTimer2); S.ended = false;
   }
 
   function setPauseUI(paused) {
@@ -533,7 +534,8 @@ input[type=file] { font: inherit; color: var(--muted); max-width: 100%; }
       hold(false); S.phase = "walking"; S.last = performance.now(); setPauseUI(false);
       $("buzzBtn").disabled = false; $("frozen").hidden = true;
     } else if (S.phase === "done") {
-      hold(!S.held); setPauseUI(S.held);
+      if (S.ended) { hold(false); startMusic(S.song); S.ended = false; setPauseUI(false); }
+      else { hold(!S.held); setPauseUI(S.held); }
     }
   }
 
@@ -593,6 +595,13 @@ input[type=file] { font: inherit; color: var(--muted); max-width: 100%; }
 
   function finish(won) {
     S.phase = "done"; hold(false);
+    // Let the reveal play for 5 seconds, then fade the music out
+    clearTimeout(S.endTimer); clearTimeout(S.endTimer2);
+    S.endTimer = setTimeout(() => {
+      if (S.phase !== "done" || !songBus) return;
+      songBus.gain.setTargetAtTime(0, ctx.currentTime, 0.25);
+      S.endTimer2 = setTimeout(() => { if (S.phase === "done") { stopMusic(); S.ended = true; setPauseUI(true); } }, 1000);
+    }, 4000);
     $("pauseBtn").disabled = false; setPauseUI(false);
     $("frozen").hidden = true; $("buzzBtn").hidden = true; $("buzzBtn").disabled = false; $("giveUp").hidden = true; $("guessPanel").hidden = true;
     // Drive the rest of the way so the player hears the reveal clearly
@@ -662,6 +671,24 @@ input[type=file] { font: inherit; color: var(--muted); max-width: 100%; }
     job.catch(() => cache.delete(key));
     return job;
   }
+  // Shuffled deck: every song plays once before any repeats, remembered across page refreshes
+  const DECK_KEY = "earshot.deck.v1";
+  function newDeck(avoid) {
+    const order = CLASSIC.map((_, i) => i);
+    for (let i = order.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
+    if (avoid != null && order[0] === avoid && order.length > 1) [order[0], order[1]] = [order[1], order[0]];
+    return { order, pos: 0 };
+  }
+  let deck = (() => {
+    try { const d = JSON.parse(localStorage.getItem(DECK_KEY)); if (d && Array.isArray(d.order) && d.order.length === CLASSIC.length && d.pos >= 0) return d; } catch (_) {}
+    return newDeck(null);
+  })();
+  const saveDeck = () => { try { localStorage.setItem(DECK_KEY, JSON.stringify(deck)); } catch (_) {} };
+  function drawEntry() {
+    if (deck.pos >= deck.order.length) deck = newDeck(deck.order[deck.order.length - 1]);
+    const e = CLASSIC[deck.order[deck.pos++]]; saveDeck(); return e;
+  }
+  const peekEntry = () => deck.pos < deck.order.length ? CLASSIC[deck.order[deck.pos]] : null;
   const randomEntry = (not) => { let e; do { e = CLASSIC[Math.floor(Math.random() * CLASSIC.length)]; } while (not && e === not && CLASSIC.length > 1); return e; };
   function srcNote(ok) {
     $("srcNote").innerHTML = ok
@@ -681,13 +708,13 @@ input[type=file] { font: inherit; color: var(--muted); max-width: 100%; }
       let p = null;
       for (let i = 0; i < 4 && !p; i++) {
         try { p = await loadPreview(entry); }
-        catch (err) { if (String(err).includes("no match")) entry = randomEntry(entry); else if (i >= 1) throw err; }
+        catch (err) { if (String(err).includes("no match")) entry = drawEntry(); else if (i >= 1) throw err; }
       }
       if (!p) throw new Error("none");
       previewMode = true; srcNote(true);
       S.entry = entry;
       S.song = { title: `${entry[0]} (${entry[1]})`, custom: true, preview: true, buffer: p.buffer, link: p.link, offset: skipFadeIn(p.buffer), decade: entry[2], aliasesNorm: [norm(entry[0]), norm(entry[1] + entry[0])] };
-      nextEntry = randomEntry(entry); loadPreview(nextEntry).catch(() => {});
+      nextEntry = peekEntry(); if (nextEntry) loadPreview(nextEntry).catch(() => {});
     } catch (_) {
       if (previewMode !== true) { previewMode = false; srcNote(false); if (!S.song || S.song.preview) S.song = dailySong; }
       else { $("srcNote").textContent = "That song's preview wouldn't load. Press New game to try another."; }
@@ -699,10 +726,10 @@ input[type=file] { font: inherit; color: var(--muted); max-width: 100%; }
     initAudio(); ctx.resume();
     stopMusic();
     S.scene = SCENES[Math.floor(Math.random() * SCENES.length)];
-    S.label = "Practice"; S.daily = false;
+    S.label = "Free play"; S.daily = false;
     if (previewMode) {
       resetRound();
-      await prepareRound(nextEntry || randomEntry(S.entry));
+      await prepareRound(drawEntry());
       if (S.phase === "idle") begin();
       return;
     }
@@ -831,7 +858,7 @@ input[type=file] { font: inherit; color: var(--muted); max-width: 100%; }
   }
 
   resetRound(); setVol(vol);
-  prepareRound(CLASSIC[(dayNo * 7 + 3) % CLASSIC.length]);
+  prepareRound(drawEntry());
   requestAnimationFrame(frame);
 })();
 </script>

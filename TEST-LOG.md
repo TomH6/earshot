@@ -5,6 +5,29 @@ The version name is also shown at the bottom of the game page, so you can check 
 
 ---
 
+## v1.2 "No Repeats" (2026-10-10)
+
+**Problem found:** the same song kept coming back. Cause: on every page load the game played the "daily" song, which is fixed for the whole day, so each refresh replayed it. New game also only avoided the song just played.
+
+**Changes**
+- Songs now come from a shuffled deck: all 70 play once before any repeats. The deck is remembered in the browser, so refreshing the page gives the next song, not the same one.
+- When the deck runs out it is reshuffled, and the last song played can't come first.
+- The game opens in "Free play" mode instead of a fixed daily song.
+- After a round ends, the reveal plays for 5 seconds and then fades out. Pressing Play brings it back.
+
+**Tests** (headless Chrome, simulated Apple Music responses, page served at the real site address)
+
+| Test | Expected | Result |
+|---|---|---|
+| 3 page refreshes | 3 different songs | Pass: Smoke on the Water, Wonderwall, Rock and Roll All Nite |
+| 3 refreshes + 8 New games | 11 different songs | Pass: 11 of 11 unique |
+| Music 4 s after round ends | Still playing | Pass |
+| Music 6 s after round ends | Stopped | Pass |
+| Press Play after auto-stop | Music plays again | Pass |
+| Script errors | None | Pass: none |
+
+---
+
 ## v1.1 "Short Road" (2026-10-10)
 
 **Changes**
