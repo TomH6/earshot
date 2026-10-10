@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Earshot Players</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,800&family=Figtree:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: stat tiles, then the full player table, then the latest results. Same dusk palette as the game. */
+:root {
+  --night: #0d1122; --dusk: #19203d; --dusk-2: #252d52; --ink: #ecebf5; --muted: #9ba1c4;
+  --lamp: #ffb547; --good: #72d9a6; --bad: #ff8577; --line: rgba(236,235,245,.12);
+  --f-display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --f-body: "Figtree", system-ui, -apple-system, sans-serif;
+  --f-num: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; background: var(--night); color: var(--ink); }
+body { font-family: var(--f-body); font-size: 15px; line-height: 1.5; }
+.wrap { max-width: 960px; margin: 0 auto; padding: 24px 16px 48px; display: grid; gap: 20px; }
+.wrap > * { min-width: 0; }
+h1 { font-family: var(--f-display); font-weight: 800; font-size: 1.9rem; margin: 0; letter-spacing: -.02em; }
+h1 span { color: var(--lamp); }
+h2 { font-family: var(--f-display); font-weight: 800; font-size: 1.15rem; margin: 0 0 10px; }
+.sub { color: var(--muted); margin: 4px 0 0; }
+a { color: var(--lamp); }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.tile { background: var(--dusk); border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
+.tile .k { font-size: .75rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.tile .v { font-family: var(--f-num); font-weight: 600; font-size: 1.6rem; font-variant-numeric: tabular-nums; }
+.panel { background: var(--dusk); border: 1px solid var(--line); border-radius: 14px; padding: 16px; min-width: 0; }
+.tablewrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: .9rem; min-width: 640px; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+th { color: var(--muted); font-weight: 500; font-size: .75rem; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; }
+td.num, th.num { text-align: right; font-family: var(--f-num); font-variant-numeric: tabular-nums; }
+.pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: .75rem; font-weight: 600; background: var(--dusk-2); }
+.pill.won { color: var(--good); } .pill.lost { color: var(--bad); }
+.empty { color: var(--muted); padding: 24px; text-align: center; border: 1px dashed var(--line); border-radius: 14px; }
+.hint { color: var(--muted); font-size: .85rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div>
+    <h1>Ear<span>shot</span> players</h1>
+    <p class="sub">Everyone who has signed in and played. <a href="./">Back to the game</a></p>
+  </div>
+
+  <div id="state" class="empty">Loading players…</div>
+
+  <div id="content" hidden>
+    <div class="tiles">
+      <div class="tile"><div class="k">Players</div><div class="v" id="tPlayers">0</div></div>
+      <div class="tile"><div class="k">Rounds played</div><div class="v" id="tGames">0</div></div>
+      <div class="tile"><div class="k">Win rate</div><div class="v" id="tRate">–</div></div>
+      <div class="tile"><div class="k">Played today</div><div class="v" id="tToday">0</div></div>
+    </div>
+
+    <div class="panel" style="margin-top:20px">
+      <h2>All players</h2>
+      <p class="hint" style="margin:-4px 0 10px">Sorted by farthest correct guess. A streak counts days in a row with at least one correct guess.</p>
+      <div class="tablewrap"><table>
+        <thead><tr><th>#</th><th>Player</th><th class="num">Best</th><th class="num">Played</th><th class="num">Won</th><th class="num">Win rate</th><th class="num">Streak</th><th class="num">Best streak</th><th>Last played</th></tr></thead>
+        <tbody id="players"></tbody>
+      </table></div>
+    </div>
+
+    <div class="panel" style="margin-top:20px">
+      <h2>Latest results</h2>
+      <div class="tablewrap"><table>
+        <thead><tr><th>When</th><th>Player</th><th>Song</th><th>Result</th><th class="num">Distance</th><th class="num">Buzzes</th><th>Mode</th></tr></thead>
+        <tbody id="results"></tbody>
+      </table></div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { FIREBASE_CONFIG } from "./firebase-config.js";
+import { _test } from "./players-util.js";
+const SDK = "https://www.gstatic.com/firebasejs/10.12.2";
+const $ = id => document.getElementById(id);
+const td = (text, cls) => { const e = document.createElement("td"); if (cls) e.className = cls; e.textContent = text; return e; };
+const m = n => `${Math.round(n || 0).toLocaleString("en-US")} m`;
+
+(async () => {
+  if (!FIREBASE_CONFIG || !FIREBASE_CONFIG.apiKey) { $("state").textContent = "Player tracking isn't switched on yet: the Firebase project still needs to be set up."; return; }
+  try {
+    const [{ initializeApp }, F] = await Promise.all([import(`${SDK}/firebase-app.js`), import(`${SDK}/firebase-firestore.js`)]);
+    const db = F.getFirestore(initializeApp(FIREBASE_CONFIG));
+    const [ps, rs] = await Promise.all([
+      F.getDocs(F.query(F.collection(db, "players"), F.orderBy("best", "desc"))),
+      F.getDocs(F.query(F.collection(db, "results"), F.orderBy("at", "desc"), F.limit(50)))
+    ]);
+    const players = ps.docs.map(d => d.data());
+    if (!players.length) { $("state").textContent = "No players yet. Sign in on the game page and finish a round."; return; }
+    $("state").hidden = true; $("content").hidden = false;
+
+    const games = players.reduce((a, p) => a + (p.games || 0), 0), wins = players.reduce((a, p) => a + (p.wins || 0), 0);
+    const today = _test.dayKey();
+    $("tPlayers").textContent = players.length;
+    $("tGames").textContent = games;
+    $("tRate").textContent = games ? Math.round(wins / games * 100) + "%" : "–";
+    $("tToday").textContent = players.filter(p => p.lastPlayed === today).length;
+
+    players.forEach((p, i) => {
+      const tr = document.createElement("tr");
+      tr.append(td(i + 1, "num"), td(p.name || "Player"), td(m(p.best), "num"), td(p.games || 0, "num"), td(p.wins || 0, "num"),
+        td(p.games ? Math.round((p.wins || 0) / p.games * 100) + "%" : "–", "num"), td(_test.liveStreak(p), "num"), td(p.bestStreak || 0, "num"), td(p.lastPlayed || "–"));
+      $("players").append(tr);
+    });
+    rs.docs.forEach(d => {
+      const r = d.data(), tr = document.createElement("tr");
+      const when = r.at && r.at.toDate ? r.at.toDate().toLocaleString(undefined, { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : r.day;
+      const res = document.createElement("td"); const pill = document.createElement("span");
+      pill.className = "pill " + (r.won ? "won" : "lost"); pill.textContent = r.won ? "Named it" : r.reason === "time" ? "Time's up" : "Missed"; res.append(pill);
+      tr.append(td(when), td(r.name || "Player"), td(r.song || ""), res, td(r.won ? m(r.distance) : "–", "num"), td(r.buzzes ?? "", "num"), td(r.mode || ""));
+      $("results").append(tr);
+    });
+  } catch (e) {
+    console.error("[Earshot players]", e);
+    $("state").textContent = "Couldn't load players. Check that the Firestore database exists and the rules from firestore.rules are published.";
+  }
+})();
+</script>
+</body>
+</html>

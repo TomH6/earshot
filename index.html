@@ -91,6 +91,23 @@ input[type=text] { flex: 1 1 220px; min-width: 0; font: inherit; color: var(--in
 
 .listen { color: var(--lamp); font-weight: 600; text-decoration: none; }
 .listen:hover { text-decoration: underline; }
+.acctbar { display: grid; gap: 6px; }
+.account { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; min-height: 44px; }
+.gbtn { background: #fff; color: #1f1f1f; border: 1px solid #dadce0; border-radius: 999px; padding: 10px 18px; font-weight: 600; }
+.who { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.whotext { display: grid; min-width: 0; }
+.whotext b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--lamp); color: var(--night); display: grid; place-items: center; font-weight: 700; flex: none; }
+.linkbtn { background: transparent; color: var(--muted); border: 1px solid var(--line); padding: 8px 14px; }
+.boards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+.lb h3 { margin: 0 0 8px; font-size: .8rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.lb ol { margin: 0; padding-left: 1.6em; display: grid; gap: 4px; }
+.lb li { padding: 2px 0; }
+.lb li > span { display: inline-flex; }
+.lb li { display: list-item; }
+.lb .nm { max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+.lb .val { float: right; font-family: var(--f-num); font-variant-numeric: tabular-nums; color: var(--lamp); }
+.lb li.mine .nm { color: var(--lamp); font-weight: 600; }
 .score { font-family: var(--f-num); font-weight: 600; font-size: 3rem; color: var(--lamp); line-height: 1; font-variant-numeric: tabular-nums; }
 .result.lost .score { color: var(--muted); }
 pre.share { margin: 0; font-family: var(--f-num); font-size: .9rem; background: var(--night); border: 1px solid var(--line); border-radius: 10px; padding: 12px; white-space: pre-wrap; user-select: all; }
@@ -111,6 +128,11 @@ input[type=file] { font: inherit; color: var(--muted); max-width: 100%; }
     </div>
     <div class="puzzle-no" id="puzzleNo">Daily #1</div>
   </header>
+
+  <div class="acctbar">
+    <div class="account" id="account" aria-live="polite"></div>
+    <p class="hint" id="acctMsg" hidden></p>
+  </div>
 
   <div class="stage">
     <canvas id="scene" aria-hidden="true"></canvas>
@@ -186,7 +208,16 @@ input[type=file] { font: inherit; color: var(--muted); max-width: 100%; }
       <button class="primary" id="copyBtn">Copy result</button>
       <button id="practiceBtn">Play a practice round</button>
     </div>
+    <p class="hint" id="saveNote" style="margin:0" hidden></p>
   </div>
+
+  <section class="panel" id="board" hidden>
+    <div class="row" style="justify-content: space-between">
+      <h2>Leaderboards</h2>
+      <a class="listen" href="players.html">All players ↗</a>
+    </div>
+    <div id="boardBody"></div>
+  </section>
 
   <details>
     <summary>Optional: play your own 90s rock files</summary>
@@ -200,7 +231,7 @@ input[type=file] { font: inherit; color: var(--muted); max-width: 100%; }
   <details open>
     <summary>How to play</summary>
     <ul class="how" style="margin-top:12px">
-      <li>You drive at 90 km/h toward a song playing 1.4 km away. The music kicks in after 2 seconds on the road, and the drive takes under a minute.</li>
+      <li>You drive at about 104 km/h toward a song playing 1.4 km away. The music kicks in after 2 seconds on the road, and the drive takes under 50 seconds.</li>
       <li>Far away you mostly hear the bass and the echo. Up close the melody comes through.</li>
       <li>Buzz the moment you recognize it. The distance freezes while you type.</li>
       <li>The music stops while you guess. A wrong guess moves you 150 m closer. You get 3 buzzes.</li>
@@ -295,14 +326,15 @@ input[type=file] { font: inherit; color: var(--muted); max-width: 100%; }
   const dailyScene = SCENES[(dayNo * 5 + 1) % SCENES.length];
 
   // ---------- Game constants ----------
-  const START_D = 1400, WALK_SECS = 56, CURVE = 1, INTRO_MS = 2000, PENALTY = 150, BUZZES = 3;
+  const DRIVE_KMH = 90 * 1.15; // 103.5 km/h
+  const START_D = 1400, WALK_SECS = START_D / (DRIVE_KMH / 3.6), CURVE = 1, INTRO_MS = 2000, PENALTY = 150, BUZZES = 3;
   const dAt = t => START_D * (1 - Math.pow(Math.min(1, t), CURVE));
   const tAt = d => Math.pow(Math.max(0, 1 - d / START_D), 1 / CURVE);
 
   const S = { phase: "idle", t: 0, d: START_D, buzzes: BUZZES, log: [], song: dailySong, scene: dailyScene, label: "Free play", daily: false };
   // Dev mode: a new random song on every refresh. Set to false at launch for one daily song for everyone.
   // Override with #daily or #dev at the end of the address to try either mode.
-  const VERSION = 'v1.6 "End of the Road"';
+  const VERSION = 'v1.7 "Players"';
   const START_HASH = location.hash;
   const DEV_MODE = START_HASH === "#daily" ? false : START_HASH === "#dev" ? true : true;
   // #daily / #dev apply to this one load only: clear them so the next refresh is back to normal
@@ -350,7 +382,7 @@ input[type=file] { font: inherit; color: var(--muted); max-width: 100%; }
     const ambF = ctx.createBiquadFilter(); ambF.type = "bandpass"; ambF.frequency.value = 1100; ambF.Q.value = 0.6;
     const lfo = ctx.createOscillator(); lfo.frequency.value = 0.08; const lfoG = ctx.createGain(); lfoG.gain.value = 400;
     lfo.connect(lfoG); lfoG.connect(ambF.frequency); lfo.start();
-    const ambG = ctx.createGain(); ambG.gain.value = 0.075;
+    const ambG = ctx.createGain(); ambG.gain.value = 0.0375; // wind noise (halved in v1.7)
     amb.connect(ambF); ambF.connect(ambG); ambG.connect(master); amb.start();
     applyDistance(START_D, true);
   }
@@ -368,7 +400,7 @@ input[type=file] { font: inherit; color: var(--muted); max-width: 100%; }
     const far = 1 - Math.exp(-d / 450);
     const s = performance.now() / 1000;
     const w = (Math.sin(s * 0.9) + Math.sin(s * 2.3 + 1) + Math.sin(s * 0.37 + 2)) / 3;
-    const gust = 1 - 0.45 * far * Math.max(0, Math.min(1, w + 0.25));
+    const gust = 1 - 0.22 * far * Math.max(0, Math.min(1, w + 0.25));
     lp1.frequency.setTargetAtTime(cut, now, k); lp2.frequency.setTargetAtTime(cut, now, k);
     distGain.gain.setTargetAtTime((0.2 + 0.8 * Math.exp(-d / 550)) * gust, now, instant ? 0.001 : 0.12);
     dry.gain.setTargetAtTime(1 - 0.8 * far, now, k);
@@ -527,6 +559,7 @@ input[type=file] { font: inherit; color: var(--muted); max-width: 100%; }
 
   function resetRound() {
     S.phase = "idle"; S.t = 0; S.d = START_D; S.buzzes = BUZZES; S.log = [];
+    $("saveNote").hidden = true;
     setScene(); renderPips(); renderDistance();
     $("startBtn").hidden = false; $("startBtn").textContent = "Start driving";
     $("buzzBtn").hidden = true; $("giveUp").hidden = true;
@@ -634,6 +667,11 @@ input[type=file] { font: inherit; color: var(--muted); max-width: 100%; }
       : reason === "time" ? "You reached the speakers without naming it. Here it is, loud and clear." : "You drove right up to the speakers. Listen to it clearly now.";
     if (S.song.decade) $("resSub").textContent += ` ${S.song.decade === 80 ? "An" : "A"} ${S.song.decade}s classic.`;
     const line = won ? `📍 ${fmt(score)} m away at ${Math.round(S.buzzKmh || 0)} km/h` : reason === "time" ? "⏱️ Ran out of road" : "📍 Had to stand next to the speaker";
+    try {
+      window.dispatchEvent(new CustomEvent("earshot:result", { detail: {
+        won, reason: reason || (won ? "correct" : "gave up"), distance: won ? score : 0, song: S.song.title,
+        mode: S.daily ? "daily" : DEV_MODE ? "dev" : "practice", buzzes: BUZZES - S.buzzes } }));
+    } catch (_) {}
     try { $("result").scrollIntoView({ block: "nearest", behavior: reduce ? "auto" : "smooth" }); } catch (_) {}
     $("shareText").textContent = `Earshot ${S.daily ? "#" + (dayNo + 1) : "(practice)"} 🎵\n${line}` + (S.log.length ? `\n${S.log.join("")}` : "");
     $("copyBtn").textContent = "Copy result";
@@ -893,3 +931,4 @@ input[type=file] { font: inherit; color: var(--muted); max-width: 100%; }
   requestAnimationFrame(frame);
 })();
 </script>
+<script type="module" src="players.js"></script>

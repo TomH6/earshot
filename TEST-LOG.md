@@ -5,6 +5,39 @@ The version name is also shown at the bottom of the game page, so you can check 
 
 ---
 
+## v1.7 "Players" (2026-10-10)
+
+**Changes**
+- **Sign in with Google** button above the game (Firebase Authentication). Signed-in players see their name, best distance, current streak and rounds won.
+- Every finished round is saved for the signed-in player: song, won or not, distance, buzzes used, mode, day. Stats per player: rounds played, rounds won, best distance, current streak and best streak (days in a row with at least one correct guess).
+- **Leaderboards** under the result: farthest correct guess and longest win streak, top 10 each, with your own row highlighted.
+- New **players.html** page: every player with full stats, plus the latest 50 results.
+- `firestore.rules` (who can read and write) and `SETUP-FIREBASE.md` (5-minute setup guide). Until Firebase is set up, the button explains that sign-in isn't switched on yet and the game works as before.
+- Wind noise halved, and wind gusts swallow the music half as much.
+- Driving speed up 15%: 90 → 103.5 km/h. The drive now takes about 49 seconds.
+
+**Tests** (headless Chrome; Firebase replaced by an in-memory stand-in with the same calls; simulated Apple Music)
+
+| Test | Expected | Result |
+|---|---|---|
+| Firebase not set up | Button explains sign-in isn't on; leaderboard placeholder | Pass |
+| Sign in | Name and stats appear, Sign out button | Pass: "Tom H · Best 0 m · Streak 0 · 0/0 won" |
+| Win a round | Result saved; games 1, wins 1, best = score, streak 1 | Pass: best 1,350 m, streak 1 |
+| Win again, last win yesterday with 3-day streak | Streak becomes 4, best streak 4 | Pass |
+| Give up a round | Games +1, wins and streak unchanged | Pass: 3 played, 2 won, streak 4 |
+| Results stored | One per round with song, distance, buzzes, mode | Pass: 3 results |
+| Leaderboards with 2 other players | Correct order, own row highlighted | Pass |
+| Sign out, then finish a round | Note asks to sign in to save | Pass |
+| players.html | 3 players and 3 results listed | Pass |
+| Phone width (400 px), game and players page | No sideways scrolling | Pass |
+| Speed | 103–104 km/h, about 288 m per 10 s | Pass: 103 km/h, 288 m |
+| Wind noise level | Half of before (0.075 → 0.0375) | Pass |
+| Script errors | None | Pass: none |
+
+**Not tested yet:** the real Firebase project (it doesn't exist yet). To check once it's set up: real Google sign-in pop-up, saving to the real database, and the published rules.
+
+---
+
 ## v1.6 "End of the Road" (2026-10-10)
 
 **Changes**
