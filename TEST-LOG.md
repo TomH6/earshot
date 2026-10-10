@@ -5,6 +5,29 @@ The version name is also shown at the bottom of the game page, so you can check 
 
 ---
 
+## v1.4 "Flight Recorder" (2026-10-10)
+
+**Problem reported:** "Dream On" keeps playing on every refresh. Dream On is exactly the song daily mode picks for Daily #1, so the browser is running daily mode: either the address still ends in `#daily`, or the browser is showing an old cached copy (v1.1 played the daily song on every load).
+
+**Changes**
+- Run log: every time the game loads a song it records the time, version, mode (dev or daily), event (page load, new game, restart), song, audio source (Apple preview or built-in cover) and the end of the address (`#daily`, `#dev` or plain). Kept in the browser, last 500 runs.
+- New dashboard page, `log.html` (link at the bottom of the game): totals, most-played song, a diagnosis box that explains repeats (for example "the address ends in #daily"), a bar chart of songs played, and the full run table with back-to-back repeats highlighted. Copy and Clear buttons.
+- The version label at the bottom of the game is now generated from one `VERSION` value in the code.
+- The game page now has a proper HTML header (doctype and UTF-8). It was missing because the page started life as a chat artifact.
+
+**Tests** (headless Chrome, simulated Apple Music responses, pages served at the real site address)
+
+| Test | Expected | Result |
+|---|---|---|
+| 3 plain loads + 3 loads with `#daily` | 6 runs logged, 4 different songs | Pass: 6 runs, 4 songs |
+| Dashboard diagnosis after repeated `#daily` loads | Names the song and blames `#daily` | Pass |
+| Dashboard with no back-to-back repeats | Green "no repeats" box | Pass |
+| Footer label | Earshot v1.4 "Flight Recorder" | Pass |
+| Dashboard at phone width (400 px) | No sideways scrolling | Pass (after a fix) |
+| Script errors | None | Pass, after adding the missing UTF-8 header (without it, a strict server could break the song-name matching) |
+
+---
+
 ## v1.3 "Dev Mode" (2026-10-10)
 
 **Changes**

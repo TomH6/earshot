@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Earshot Run Log</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,800&family=Figtree:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: a single column of stat tiles, warnings, song frequency bars, then the raw run table. Same dusk palette as the game. */
+:root {
+  --night: #0d1122; --dusk: #19203d; --dusk-2: #252d52; --ink: #ecebf5; --muted: #9ba1c4;
+  --lamp: #ffb547; --good: #72d9a6; --bad: #ff8577; --line: rgba(236,235,245,.12);
+  --f-display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --f-body: "Figtree", system-ui, -apple-system, sans-serif;
+  --f-num: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; background: var(--night); color: var(--ink); }
+body { font-family: var(--f-body); font-size: 15px; line-height: 1.5; }
+.wrap { max-width: 900px; margin: 0 auto; padding: 24px 16px 48px; display: grid; gap: 20px; }
+header { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+h1 { font-family: var(--f-display); font-weight: 800; font-size: 1.9rem; margin: 0; letter-spacing: -.02em; }
+h1 span { color: var(--lamp); }
+h2 { font-family: var(--f-display); font-weight: 800; font-size: 1.15rem; margin: 0 0 10px; }
+.sub { color: var(--muted); margin: 4px 0 0; }
+a { color: var(--lamp); }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+button { font: inherit; font-weight: 600; cursor: pointer; border: 0; border-radius: 10px; padding: 9px 14px; color: var(--ink); background: var(--dusk-2); }
+button:hover { filter: brightness(1.12); }
+button:focus-visible { outline: 2px solid var(--lamp); outline-offset: 2px; }
+button.danger { background: transparent; border: 1px solid var(--bad); color: var(--bad); }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
+.tile { background: var(--dusk); border: 1px solid var(--line); border-radius: 14px; padding: 14px; min-width: 0; }
+.tile .k { font-size: .75rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.tile .v { font-family: var(--f-num); font-weight: 600; font-size: 1.6rem; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.tile .v.small { font-size: 1rem; line-height: 1.35; padding-top: 6px; }
+.panel { background: var(--dusk); border: 1px solid var(--line); border-radius: 14px; padding: 16px; min-width: 0; }
+.alert { border-radius: 12px; padding: 12px 14px; border: 1px solid; display: grid; gap: 4px; }
+.alert.bad { border-color: var(--bad); background: rgba(255,133,119,.08); }
+.alert.ok { border-color: var(--good); background: rgba(114,217,166,.08); }
+.alert b { font-weight: 600; }
+.bars { display: grid; gap: 6px; }
+.bar { display: grid; grid-template-columns: minmax(0, 15em) 1fr 2.5em; gap: 10px; align-items: center; font-size: .9rem; }
+.bar .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bar .track { height: 10px; background: var(--dusk-2); border-radius: 6px; overflow: hidden; }
+.bar .fill { height: 100%; background: var(--lamp); border-radius: 6px; }
+.bar.rep .fill { background: var(--bad); }
+.bar .n { font-family: var(--f-num); text-align: right; font-variant-numeric: tabular-nums; }
+.tablewrap { overflow-x: auto; }
+#content, .wrap > * { min-width: 0; }
+.bar { grid-template-columns: minmax(0, 15em) minmax(40px, 1fr) 2.5em; }
+table { width: 100%; border-collapse: collapse; font-size: .88rem; min-width: 680px; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--muted); font-weight: 500; font-size: .75rem; letter-spacing: .06em; text-transform: uppercase; }
+td.mono { font-family: var(--f-num); font-size: .8rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+tr.same td { background: rgba(255,133,119,.08); }
+.pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: .75rem; font-weight: 600; background: var(--dusk-2); white-space: nowrap; }
+.pill.dev { color: var(--good); }
+.pill.daily { color: var(--lamp); }
+.pill.fb { color: var(--bad); }
+.empty { color: var(--muted); padding: 24px; text-align: center; border: 1px dashed var(--line); border-radius: 14px; }
+#confirm { display: flex; gap: 8px; align-items: center; }
+.hint { color: var(--muted); font-size: .85rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Ear<span>shot</span> run log</h1>
+      <p class="sub">Every song the game loads in this browser. <a href="./">Back to the game</a></p>
+    </div>
+    <div class="row">
+      <button id="copyBtn">Copy log</button>
+      <button class="danger" id="clearBtn">Clear log</button>
+      <span id="confirm" hidden><span class="hint">Delete all entries?</span><button class="danger" id="yesClear">Delete</button><button id="noClear">Cancel</button></span>
+    </div>
+  </header>
+
+  <div id="emptyState" class="empty" hidden>No runs logged yet. Open the game (or refresh it) and come back here. The log updates automatically.</div>
+
+  <div id="content" hidden>
+    <div class="tiles">
+      <div class="tile"><div class="k">Runs logged</div><div class="v" id="tRuns">0</div></div>
+      <div class="tile"><div class="k">Different songs</div><div class="v" id="tUnique">0</div></div>
+      <div class="tile"><div class="k">Most played</div><div class="v small" id="tTop">–</div></div>
+      <div class="tile"><div class="k">Latest version seen</div><div class="v small" id="tVer">–</div></div>
+    </div>
+
+    <div id="diag" style="margin-top:20px"></div>
+
+    <div class="panel" style="margin-top:20px">
+      <h2>Songs played</h2>
+      <div class="bars" id="bars"></div>
+    </div>
+
+    <div class="panel" style="margin-top:20px">
+      <h2>All runs, newest first</h2>
+      <p class="hint" style="margin:-4px 0 10px">Rows highlighted in red played the same song as the run before.</p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Time</th><th>Version</th><th>Mode</th><th>Event</th><th>Song</th><th>Source</th><th>Address</th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const KEY = "earshot.log.v1";
+  const $ = id => document.getElementById(id);
+  const read = () => { try { return JSON.parse(localStorage.getItem(KEY) || "[]"); } catch (_) { return null; } };
+  const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+  const fmtTime = iso => { const d = new Date(iso); return d.toLocaleDateString(undefined, { day: "2-digit", month: "short" }) + " " + d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" }); };
+
+  function render() {
+    const log = read();
+    if (log === null) {
+      $("emptyState").textContent = "This browser is blocking site storage, so the game can't keep a log here. Check that cookies and site data are allowed for this site.";
+      $("emptyState").hidden = false; $("content").hidden = true; return;
+    }
+    $("emptyState").hidden = log.length > 0; $("content").hidden = log.length === 0;
+    if (!log.length) return;
+
+    const loads = log.filter(r => r.event !== "restart");
+    const counts = new Map();
+    loads.forEach(r => counts.set(r.song, (counts.get(r.song) || 0) + 1));
+    const sorted = [...counts.entries()].sort((a, b) => b[1] - a[1]);
+
+    $("tRuns").textContent = log.length;
+    $("tUnique").textContent = counts.size;
+    $("tTop").textContent = sorted.length ? `${sorted[0][0]} · ${sorted[0][1]}×` : "–";
+    $("tVer").textContent = log[log.length - 1].v || "before v1.4";
+
+    // Diagnosis: look at the most recent page loads
+    const diag = $("diag"); diag.textContent = "";
+    const pageLoads = log.filter(r => r.event === "page load");
+    let streak = pageLoads.length ? 1 : 0;
+    for (let i = pageLoads.length - 1; i > 0 && pageLoads[i].song === pageLoads[i - 1].song; i--) streak++;
+    const recentLoads = pageLoads.slice(-streak);
+    let consecutive = 0;
+    for (let i = 1; i < loads.length; i++) if (loads[i].song === loads[i - 1].song) consecutive++;
+    const box = el("div", "alert");
+    if (streak >= 2) {
+      box.classList.add("bad");
+      box.append(el("b", null, `The last ${recentLoads.length} page loads all played “${recentLoads[0].song}”.`));
+      const last = recentLoads[recentLoads.length - 1];
+      let why = "The game code chose the same song each time.";
+      if (last.mode === "daily" && last.hash === "#daily") why = "The address ends in #daily, which forces daily mode (one song per day). Remove #daily from the address to get a new song on every refresh.";
+      else if (last.mode === "daily") why = "The game ran in daily mode, which plays one song per day. Dev mode is switched off in the code.";
+      else if (last.source !== "Apple preview") why = "Apple previews didn't load, so the game fell back to the built-in songs.";
+      box.append(el("span", null, why));
+    } else if (consecutive > 0) {
+      box.classList.add("bad");
+      box.append(el("b", null, `${consecutive} time${consecutive > 1 ? "s" : ""} a run played the same song as the run right before it.`));
+      box.append(el("span", null, "Those rows are highlighted in the table below."));
+    } else {
+      box.classList.add("ok");
+      box.append(el("b", null, "No back-to-back repeats."));
+      box.append(el("span", null, "Every logged run played a different song from the one before it. If you still hear repeats, your browser may be showing an old copy of the game: old copies don't write to this log at all."));
+    }
+    diag.append(box);
+
+    // Frequency bars
+    const bars = $("bars"); bars.textContent = "";
+    const max = sorted.length ? sorted[0][1] : 1;
+    sorted.slice(0, 30).forEach(([name, n]) => {
+      const row = el("div", "bar" + (n > 1 ? " rep" : ""));
+      row.append(el("span", "name", name));
+      const tr = el("div", "track"), f = el("div", "fill"); f.style.width = (n / max * 100) + "%"; tr.append(f); row.append(tr);
+      row.append(el("span", "n", n + "×"));
+      bars.append(row);
+    });
+    if (sorted.length > 30) bars.append(el("p", "hint", `…and ${sorted.length - 30} more songs played once or more.`));
+
+    // Table
+    const body = $("rows"); body.textContent = "";
+    for (let i = log.length - 1; i >= 0; i--) {
+      const r = log[i];
+      const prevLoad = (() => { if (r.event === "restart") return null; for (let j = i - 1; j >= 0; j--) if (log[j].event !== "restart") return log[j]; return null; })();
+      const tr = el("tr", prevLoad && prevLoad.song === r.song ? "same" : "");
+      tr.append(el("td", "mono", fmtTime(r.t)));
+      tr.append(el("td", "mono", r.v || ""));
+      const m = el("td"); m.append(el("span", "pill " + (r.mode === "dev" ? "dev" : "daily"), r.mode)); tr.append(m);
+      tr.append(el("td", null, r.event));
+      tr.append(el("td", null, r.song));
+      const sTd = el("td"); sTd.append(el("span", "pill" + (r.source === "Apple preview" ? "" : " fb"), r.source)); tr.append(sTd);
+      tr.append(el("td", "mono", r.hash ? r.hash : "(plain)"));
+      body.append(tr);
+    }
+  }
+
+  $("copyBtn").onclick = () => {
+    const log = read() || [];
+    const txt = log.map(r => [r.t, r.v, r.mode, r.event, r.song, r.source, r.hash || "(plain)"].join(" | ")).join("\n") || "(empty log)";
+    const btn = $("copyBtn");
+    navigator.clipboard.writeText(txt).then(() => { btn.textContent = "Copied"; setTimeout(() => btn.textContent = "Copy log", 1500); },
+      () => { btn.textContent = "Copy failed"; });
+  };
+  $("clearBtn").onclick = () => { $("clearBtn").hidden = true; $("confirm").hidden = false; };
+  $("noClear").onclick = () => { $("clearBtn").hidden = false; $("confirm").hidden = true; };
+  $("yesClear").onclick = () => { try { localStorage.removeItem(KEY); } catch (_) {} $("clearBtn").hidden = false; $("confirm").hidden = true; render(); };
+
+  addEventListener("storage", e => { if (e.key === KEY) render(); });
+  addEventListener("focus", render);
+  render();
+})();
+</script>
+</body>
+</html>
