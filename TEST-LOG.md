@@ -5,6 +5,31 @@ The version name is also shown at the bottom of the game page, so you can check 
 
 ---
 
+## v1.5 "One-Time Pass" (2026-10-10)
+
+**What the run log showed** (Tom's Chrome, 17:45–17:55)
+- 3 page loads at the address ending in `#daily` → Dream On all 3 times (daily mode, working as designed).
+- 1 plain page load → Crazy Train (dev mode, new song).
+- 1 Restart → Crazy Train again. The Restart button replays the same song by design, but the name made it look like a refresh.
+
+**Changes**
+- `#daily` and `#dev` now apply to one page load only. They clear themselves from the address, so the next refresh is back to normal dev mode. The log still records which one was used.
+- The Restart button is renamed **Replay song**, with a tooltip pointing to New game for a different song.
+
+**Tests** (headless Chrome, simulated Apple Music responses, page served at the real site address)
+
+| Test | Expected | Result |
+|---|---|---|
+| Open with `#daily` | Daily song, label "Daily #1", `#daily` removed from address | Pass: Dream On, address back to plain |
+| 2 refreshes after that | Dev mode, a new song each time | Pass: Jeremy, Paranoid |
+| Log entries | First run logged as daily/#daily, then dev/plain | Pass |
+| Button label and footer | "Replay song", v1.5 "One-Time Pass" | Pass |
+| Script errors | None | Pass: none |
+
+Also confirmed on the live site (v1.4, Claude app browser): 5 page loads gave 5 different songs.
+
+---
+
 ## v1.4 "Flight Recorder" (2026-10-10)
 
 **Problem reported:** "Dream On" keeps playing on every refresh. Dream On is exactly the song daily mode picks for Daily #1, so the browser is running daily mode: either the address still ends in `#daily`, or the browser is showing an old cached copy (v1.1 played the daily song on every load).
