@@ -5,6 +5,27 @@ The version name is also shown at the bottom of the game page, so you can check 
 
 ---
 
+## v2.1 "Share" (2026-10-11)
+
+**Changes**
+- New buttons after each round: **Share my result**, **WhatsApp**, and **Copy**.
+- The shared message is the result card plus "Can you beat me? 🎧 https://tomh6.github.io/earshot/". It never includes the song name, so it doesn't spoil the answer.
+- **Share my result** opens the phone's share sheet (WhatsApp, Instagram, SMS, etc.). On computers without a share sheet it copies the message instead.
+- **WhatsApp** opens WhatsApp with the message ready to send.
+
+**Tests** (headless Chrome, simulated Apple Music)
+
+| Test | Expected | Result |
+|---|---|---|
+| WhatsApp link | Result text + game link, no song name | Pass |
+| Share on a computer (no share sheet) | Copies the message, button says "Copied!" | Pass |
+| Share on a phone (share sheet simulated) | Share sheet receives title and full message with link | Pass |
+| Copied text ends with the game link | Yes | Pass |
+| Phone width (390 px) | No sideways scrolling, buttons wrap | Pass |
+| Script errors | None | Pass: none |
+
+---
+
 ## v2.0 "Live Players" (2026-10-11)
 
 **Changes**

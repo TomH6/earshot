@@ -116,6 +116,10 @@ input[type=text] { flex: 1 1 220px; min-width: 0; font: inherit; color: var(--in
 .stage.shake-big { animation: shake .7s ease-out 2; }
 @keyframes shake { 0%,100% { transform: none; } 15% { transform: translate(-6px, 2px) rotate(-.6deg); } 30% { transform: translate(5px, -3px) rotate(.5deg); } 45% { transform: translate(-4px, 2px); } 60% { transform: translate(3px, -1px); } 80% { transform: translate(-1px, 1px); } }
 @media (prefers-reduced-motion: reduce) { .banner.show, .banner.t3.show { animation: fadeonly 2s forwards; transform: translate(-50%, -50%); } @keyframes fadeonly { 0%, 80% { opacity: 1; } 100% { opacity: 0; } } }
+#shareBtn { display: inline-flex; align-items: center; gap: 8px; }
+.wabtn { display: inline-flex; align-items: center; gap: 8px; padding: 12px 18px; border-radius: 12px; font-weight: 600; text-decoration: none; background: #25d366; color: #0b2e1a; }
+.wabtn:hover { filter: brightness(1.08); }
+.wabtn:focus-visible { outline: 2px solid var(--lamp); outline-offset: 2px; }
 .score { font-family: var(--f-num); font-weight: 600; font-size: 3rem; color: var(--lamp); line-height: 1; font-variant-numeric: tabular-nums; }
 .result.lost .score { color: var(--muted); }
 pre.share { margin: 0; font-family: var(--f-num); font-size: .9rem; background: var(--night); border: 1px solid var(--line); border-radius: 10px; padding: 12px; white-space: pre-wrap; user-select: all; }
@@ -207,7 +211,15 @@ input[type=file] { font: inherit; color: var(--muted); max-width: 100%; }
     <a class="listen" id="listenLink" href="#" target="_blank" rel="noopener" hidden>Listen on Apple Music ↗</a>
     <pre class="share" id="shareText"></pre>
     <div class="row">
-      <button class="primary" id="copyBtn">Copy result</button>
+      <button class="primary" id="shareBtn">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="18" cy="5" r="2.6" fill="currentColor"/><circle cx="6" cy="12" r="2.6" fill="currentColor"/><circle cx="18" cy="19" r="2.6" fill="currentColor"/><path d="M8.3 10.8l7.4-4.3M8.3 13.2l7.4 4.3" stroke="currentColor" stroke-width="2"/></svg>
+        <span id="shareLabel">Share my result</span>
+      </button>
+      <a class="wabtn" id="waBtn" href="#" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2c-1.5 0-3-.4-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.2-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.8 11.9 11.9 0 0 0 4.6 4c1.7.7 2.4.8 3.2.7.5-.1 1.5-.6 1.8-1.2.2-.6.2-1.1.1-1.2l-.4-.3z"/></svg>
+        WhatsApp
+      </a>
+      <button id="copyBtn">Copy</button>
       <button id="practiceBtn">Play a practice round</button>
     </div>
     <p class="hint" id="saveNote" style="margin:0" hidden></p>
@@ -338,7 +350,7 @@ input[type=file] { font: inherit; color: var(--muted); max-width: 100%; }
   const S = { phase: "idle", t: 0, d: START_D, buzzes: BUZZES, log: [], song: dailySong, scene: dailyScene, label: "Free play", daily: false };
   // Dev mode: a new random song on every refresh. Set to false at launch for one daily song for everyone.
   // Override with #daily or #dev at the end of the address to try either mode.
-  const VERSION = 'v2.0 "Live Players"';
+  const VERSION = 'v2.1 "Share"';
   const START_HASH = location.hash;
   const DEV_MODE = START_HASH === "#daily" ? false : START_HASH === "#dev" ? true : true;
   // #daily / #dev apply to this one load only: clear them so the next refresh is back to normal
@@ -766,7 +778,8 @@ input[type=file] { font: inherit; color: var(--muted); max-width: 100%; }
     } catch (_) {}
     try { $("result").scrollIntoView({ block: "nearest", behavior: reduce ? "auto" : "smooth" }); } catch (_) {}
     $("shareText").textContent = `Earshot ${S.daily ? "#" + (dayNo + 1) : "(practice)"} 🎵\n${line}` + (S.log.length ? `\n${S.log.join("")}` : "");
-    $("copyBtn").textContent = "Copy result";
+    $("copyBtn").textContent = "Copy"; $("shareLabel").textContent = "Share my result";
+    $("waBtn").href = "https://wa.me/?text=" + encodeURIComponent(shareMessage());
   }
 
   $("startBtn").onclick = begin;
@@ -786,8 +799,20 @@ input[type=file] { font: inherit; color: var(--muted); max-width: 100%; }
     if (e.code === "Space" && S.phase === "walking" && !/INPUT|BUTTON|SUMMARY/.test(document.activeElement.tagName)) { e.preventDefault(); buzz(); }
     else if (e.code === "Space" && S.phase === "walking" && document.activeElement === $("buzzBtn")) { e.preventDefault(); buzz(); }
   });
+  // Share: the result text plus a link to the game. Uses the phone's share sheet when available, otherwise copies.
+  const GAME_URL = "https://tomh6.github.io/earshot/";
+  const shareMessage = () => `${$("shareText").textContent}\n\nCan you beat me? 🎧 ${GAME_URL}`;
+  $("shareBtn").onclick = async () => {
+    const text = shareMessage();
+    if (navigator.share) {
+      try { await navigator.share({ title: "Earshot", text }); return; }
+      catch (e) { if (e && e.name === "AbortError") return; }
+    }
+    try { await navigator.clipboard.writeText(text); $("shareLabel").textContent = "Copied! Paste it anywhere"; }
+    catch (_) { $("copyBtn").onclick(); }
+  };
   $("copyBtn").onclick = () => {
-    const txt = $("shareText").textContent;
+    const txt = shareMessage();
     const done = () => { $("copyBtn").textContent = "Copied"; };
     const fallback = () => { const r = document.createRange(); r.selectNodeContents($("shareText")); const s = getSelection(); s.removeAllRanges(); s.addRange(r); $("copyBtn").textContent = "Selected, press Ctrl+C"; };
     try { navigator.clipboard.writeText(txt).then(done, fallback); } catch (_) { fallback(); }
