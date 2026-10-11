@@ -79,8 +79,8 @@ td.num, th.num { text-align: right; font-family: var(--f-num); font-variant-nume
 </div>
 
 <script type="module">
-import { FIREBASE_CONFIG } from "./firebase-config.js";
-import { _test } from "./players-util.js";
+import { FIREBASE_CONFIG } from "./firebase-config.js?v=2.0";
+import { _test } from "./players-util.js?v=2.0";
 const SDK = "https://www.gstatic.com/firebasejs/10.12.2";
 const $ = id => document.getElementById(id);
 const td = (text, cls) => { const e = document.createElement("td"); if (cls) e.className = cls; e.textContent = text; return e; };

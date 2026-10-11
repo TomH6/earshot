@@ -1,7 +1,7 @@
 // Earshot players: Google sign-in, saved results, stats, streaks and leaderboards (Firebase).
 // The game sends an "earshot:result" event at the end of each round; this module saves it for the signed-in player.
-import { FIREBASE_CONFIG } from "./firebase-config.js";
-import { dayKey, prevDay, liveStreak } from "./players-util.js";
+import { FIREBASE_CONFIG } from "./firebase-config.js?v=2.0";
+import { dayKey, prevDay, liveStreak } from "./players-util.js?v=2.0";
 
 const SDK = "https://www.gstatic.com/firebasejs/10.12.2";
 const $ = id => document.getElementById(id);
