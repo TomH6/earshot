@@ -5,6 +5,28 @@ The version name is also shown at the bottom of the game page, so you can check 
 
 ---
 
+## v2.0 "Live Players" (2026-10-11)
+
+**Changes**
+- Connected the game to the real Firebase project `earshot-b13cd` (Google sign-in + Firestore database). Sign-in, saved results, stats, streaks and leaderboards are now live.
+
+**Setup done in the Firebase console (by Tom)**
+- Google sign-in turned on; `tomh6.github.io` added to authorized domains.
+- Firestore database `(default)` created in production mode; rules from `firestore.rules` published.
+- Web app `earshot` registered. Scheduled backups skipped (needs the paid plan; not needed in dev).
+
+**Tests** (live Firebase, from the Claude app's browser at tomh6.github.io)
+
+| Test | Expected | Result |
+|---|---|---|
+| API key accepted by Firebase | Valid project | Pass |
+| Authorized domains include the game | `tomh6.github.io` listed | Pass |
+| Database reachable and readable by anyone (leaderboards) | 200, empty | Pass |
+| Live page loads Firebase without errors | Sign-in button shown | See below |
+| Real Google sign-in and first saved result | Needs Tom to sign in | Pending |
+
+---
+
 ## v1.9 "Fireworks" (2026-10-10)
 
 **Changes: celebrations that grow with the score**
