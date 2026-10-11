@@ -5,6 +5,30 @@ The version name is also shown at the bottom of the game page, so you can check 
 
 ---
 
+## v2.2 "Quiet Ending" (2026-10-11)
+
+**Problem reported:** an endless noise kept playing after solving the puzzle.
+**Cause:** the background wind sound looped forever. The music faded out 5 s after the round, but the wind was never switched off.
+
+**Changes**
+- The wind now plays only while driving: it fades in when the music starts and fades out the moment the round ends.
+- 5 s after the round ends, once the reveal fades out, all game audio is fully switched off. Pressing Play replays the song; New game starts everything again.
+
+**Tests** (headless Chrome, measuring the actual sound sent to the speakers)
+
+| Moment | Expected | Result |
+|---|---|---|
+| While driving | Music + wind | Pass: sound present |
+| 2 s after solving | Reveal playing | Pass: sound present |
+| 7 s after solving | Silent | Pass: audio off |
+| 17 s after solving | Still silent | Pass: audio off |
+| Press Play after the ending | Song plays again | Pass |
+| Next round | Music + wind back | Pass |
+| 8 s after giving up | Silent | Pass: audio off |
+| Script errors | None | Pass: none |
+
+---
+
 ## v2.1 "Share" (2026-10-11)
 
 **Changes**

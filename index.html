@@ -350,7 +350,7 @@ input[type=file] { font: inherit; color: var(--muted); max-width: 100%; }
   const S = { phase: "idle", t: 0, d: START_D, buzzes: BUZZES, log: [], song: dailySong, scene: dailyScene, label: "Free play", daily: false };
   // Dev mode: a new random song on every refresh. Set to false at launch for one daily song for everyone.
   // Override with #daily or #dev at the end of the address to try either mode.
-  const VERSION = 'v2.1 "Share"';
+  const VERSION = 'v2.2 "Quiet Ending"';
   const START_HASH = location.hash;
   const DEV_MODE = START_HASH === "#daily" ? false : START_HASH === "#dev" ? true : true;
   // #daily / #dev apply to this one load only: clear them so the next refresh is back to normal
@@ -359,6 +359,9 @@ input[type=file] { font: inherit; color: var(--muted); max-width: 100%; }
   S.label = DEV_MODE ? "Dev mode" : `Daily #${dayNo + 1}`; S.daily = !DEV_MODE;
 
   // ---------- Audio ----------
+  let windGain = null;
+  const WIND_LEVEL = 0.0375; // halved in v1.7
+  function setWind(on, secs = 0.4) { if (windGain) windGain.gain.setTargetAtTime(on ? WIND_LEVEL : 0, ctx.currentTime, secs); }
   let gtrIn, leadIn, vol = 1; // music always plays at 100%
   // Hold = audio suspended on purpose (paused or guessing); stops the page from auto-resuming it
   function hold(on) {
@@ -395,8 +398,8 @@ input[type=file] { font: inherit; color: var(--muted); max-width: 100%; }
     const ambF = ctx.createBiquadFilter(); ambF.type = "bandpass"; ambF.frequency.value = 1100; ambF.Q.value = 0.6;
     const lfo = ctx.createOscillator(); lfo.frequency.value = 0.08; const lfoG = ctx.createGain(); lfoG.gain.value = 400;
     lfo.connect(lfoG); lfoG.connect(ambF.frequency); lfo.start();
-    const ambG = ctx.createGain(); ambG.gain.value = 0.0375; // wind noise (halved in v1.7)
-    amb.connect(ambF); ambF.connect(ambG); ambG.connect(master); amb.start();
+    windGain = ctx.createGain(); windGain.gain.value = 0; // wind noise: on only while driving (see setWind)
+    amb.connect(ambF); ambF.connect(windGain); windGain.connect(master); amb.start();
     applyDistance(START_D, true);
   }
 
@@ -614,6 +617,7 @@ input[type=file] { font: inherit; color: var(--muted); max-width: 100%; }
   }
 
   function startDrive() {
+    setWind(true, 0.2);
     startMusic(S.song);
     S.phase = "walking"; S.last = performance.now();
     $("frozen").hidden = true; $("pauseBtn").disabled = false;
@@ -748,12 +752,13 @@ input[type=file] { font: inherit; color: var(--muted); max-width: 100%; }
 
   function finish(won, reason) {
     S.phase = "done"; hold(false);
+    setWind(false, 0.5);
     // Let the reveal play for 5 seconds, then fade the music out
     clearTimeout(S.endTimer); clearTimeout(S.endTimer2);
     S.endTimer = setTimeout(() => {
       if (S.phase !== "done" || !songBus) return;
       songBus.gain.setTargetAtTime(0, ctx.currentTime, 0.25);
-      S.endTimer2 = setTimeout(() => { if (S.phase === "done") { stopMusic(); S.ended = true; setPauseUI(true); } }, 1000);
+      S.endTimer2 = setTimeout(() => { if (S.phase === "done") { stopMusic(); setWind(false, 0.05); S.ended = true; setPauseUI(true); hold(true); } }, 1000);
     }, 4000);
     $("pauseBtn").disabled = false; setPauseUI(false);
     $("frozen").hidden = true; $("buzzBtn").hidden = true; $("buzzBtn").disabled = false; $("giveUp").hidden = true; $("guessPanel").hidden = true;
